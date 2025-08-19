@@ -1,7 +1,7 @@
-package org.ab.devconsole.service;
+package org.nanonative.ab.devconsole.service;
 
 import berlin.yuna.typemap.model.TypeMapI;
-import org.ab.devconsole.model.EventWrapper;
+import org.nanonative.ab.devconsole.model.EventWrapper;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
@@ -14,25 +14,41 @@ import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.*;
-import java.util.concurrent.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
-import static org.nanonative.nano.services.http.HttpServer.EVENT_HTTP_REQUEST;
 import static  org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
+import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
 
 public class DevConsoleService extends Service {
 
     // We keep a thread-safe list to track events.
     // Limit the history size to keep memory usage in check.
-    private final List<org.ab.devconsole.model.EventWrapper> eventHistory = new LinkedList<>();
+    private final List<EventWrapper> eventHistory = new LinkedList<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
     private final Set<Integer> subscribedChannels = ConcurrentHashMap.newKeySet();
-    private static final int DEFAULT_MAX_EVENTS = 1000;
     public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS =
             ConfigRegister.registerConfig("dev_console_max_events", "Max number of events to retain in the DevConsoleService");
+    public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
     private final Object lock = new Object();
     private Integer maxEvents;
+    private String basePath;
+    private final int DEFAULT_MAX_EVENTS = 1000;
+    private final String DEFAULT_PATH = "/dev/ui";
+
+    // TODO: Ensure these paths are unique and not exposed as active application endpoints
+    private final String DEV_EVENTS_PATH = "/dev/events";
+    private final String DEV_INFO_PATH = "/dev/system-info";
 
     @Override
     public void start() {
@@ -43,7 +59,7 @@ public class DevConsoleService extends Service {
                 }
             });
         }, 0, 5, TimeUnit.SECONDS);
-        context.info(() -> "[" + name() + "] started at /dev/ui");
+        context.info(() -> "[" + name() + "] started at " + basePath);
     }
 
     @Override
@@ -74,7 +90,7 @@ public class DevConsoleService extends Service {
     @Override
     public void onEvent(Event event) {
         event.payloadOpt(HttpObject.class).ifPresent(request -> {
-            if (request.pathMatch("/dev/system-info")) {
+            if (request.pathMatch(DEV_INFO_PATH)) {
                 event.acknowledge();
                 String systemInfoJson = formatToJson(getSystemInfo());
                 request.response()
@@ -85,7 +101,7 @@ public class DevConsoleService extends Service {
                 return;
             }
 
-            if (request.pathMatch("/dev/events")) {
+            if (request.pathMatch(DEV_EVENTS_PATH)) {
                 event.acknowledge();
                 String eventsJson = formatListToJsonArray(getEventList());
                 request.response()
@@ -95,7 +111,7 @@ public class DevConsoleService extends Service {
                         .respond(event);
                 return;
             }
-            if (request.pathMatch("/dev/ui")) {
+            if (request.pathMatch(basePath)) {
                 event.acknowledge();
                 try (InputStream in = getClass().getClassLoader().getResourceAsStream("index.html")) {
                     if (in == null) {
@@ -161,6 +177,7 @@ public class DevConsoleService extends Service {
     @Override
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
         this.maxEvents = merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS);
+        this.basePath  = merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElseGet(() -> DEFAULT_PATH);
     }
 
     private List<Map<String, Object>> getEventList() {

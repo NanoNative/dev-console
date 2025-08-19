@@ -1,4 +1,4 @@
-package org.ab.devconsole.model;
+package org.nanonative.ab.devconsole.model;
 
 import org.nanonative.nano.helper.event.model.Event;
 
