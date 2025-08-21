@@ -14,15 +14,13 @@ import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.locks.Lock;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.ConcurrentLinkedDeque;
 import berlin.yuna.typemap.logic.JsonEncoder;
 import berlin.yuna.typemap.model.ConcurrentTypeSet;
 
@@ -33,11 +31,10 @@ import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
 public class DevConsoleService extends Service {
 
     // All modifications to eventHistory must be thread safe
-    private final Deque<EventWrapper> eventHistory = new ArrayDeque<>();
+    private final Deque<EventWrapper> eventHistory = new ConcurrentLinkedDeque<>();
     private final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
     public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in the DevConsoleService");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
-    private static final Lock lock = new ReentrantLock();
     private Integer maxEvents;
     private String basePath;
     private final int DEFAULT_MAX_EVENTS = 1000;
@@ -72,7 +69,6 @@ public class DevConsoleService extends Service {
     private void recordEvent(Event event) {
         if(event.channelId() == EVENT_APP_HEARTBEAT)
             return;
-        lock.lock();
         if (eventHistory.size() >= maxEvents) {
             eventHistory.removeLast();
         }
@@ -81,7 +77,6 @@ public class DevConsoleService extends Service {
             .timestamp(Instant.now())
             //   .sourceService(event.asString("source")) TODO: Get event source
             .build());
-        lock.unlock();
     }
 
     @Override
