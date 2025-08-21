@@ -40,8 +40,8 @@
     async function loadData() {
         try {
             const [systemInfo, eventData] = await Promise.all([
-                fetchJson('/dev/system-info'),
-                fetchJson('/dev/events')
+                fetchJson('/dev-console/system-info'),
+                fetchJson('/dev-console/events')
             ]);
 
             document.getElementById("system").textContent = JSON.stringify(systemInfo, null, 2);
@@ -52,7 +52,7 @@
     }
 
     loadData();
-    setInterval(loadData, 10000); // refresh every 10 seconds
+    setInterval(loadData, 5000); // refresh every 5 seconds
 </script>
 </body>
 </html>

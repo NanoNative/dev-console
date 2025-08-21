@@ -5,7 +5,7 @@ import org.nanonative.ab.devconsole.model.EventWrapper;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
-import org.nanonative.nano.helper.config.ConfigRegister;
+import org.nanonative.nano.helper.ExRunnable;
 import org.nanonative.nano.helper.event.model.Event;
 import org.nanonative.nano.services.http.model.HttpObject;
 
@@ -14,52 +14,49 @@ import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.LinkedList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import berlin.yuna.typemap.logic.JsonEncoder;
+import berlin.yuna.typemap.model.ConcurrentTypeSet;
 
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static  org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
 import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
 
 public class DevConsoleService extends Service {
 
-    // We keep a thread-safe list to track events.
-    // Limit the history size to keep memory usage in check.
-    private final List<EventWrapper> eventHistory = new LinkedList<>();
-    private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
-    private final Set<Integer> subscribedChannels = ConcurrentHashMap.newKeySet();
-    public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS =
-            ConfigRegister.registerConfig("dev_console_max_events", "Max number of events to retain in the DevConsoleService");
+    // All modifications to eventHistory must be thread safe
+    private final Deque<EventWrapper> eventHistory = new ArrayDeque<>();
+    private final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
+    public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in the DevConsoleService");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
-    private final Object lock = new Object();
+    private static final Lock lock = new ReentrantLock();
     private Integer maxEvents;
     private String basePath;
     private final int DEFAULT_MAX_EVENTS = 1000;
-    private final String DEFAULT_PATH = "/dev/ui";
-
-    // TODO: Ensure these paths are unique and not exposed as active application endpoints
-    private final String DEV_EVENTS_PATH = "/dev/events";
-    private final String DEV_INFO_PATH = "/dev/system-info";
+    private final String DEFAULT_PATH = "/dev-console/ui";
+    private final String DEV_EVENTS_PATH = "/dev-console/events";
+    private final String DEV_INFO_PATH = "/dev-console/system-info";
 
     @Override
     public void start() {
-        scheduler.scheduleAtFixedRate(() -> {
-            NanoBase.EVENT_TYPES.keySet().forEach(channelId -> {
-                if (subscribedChannels.add(channelId)) {
-                    context.subscribeEvent(channelId, this::recordEvent);
-                }
-            });
-        }, 0, 5, TimeUnit.SECONDS);
         context.info(() -> "[" + name() + "] started at " + basePath);
+        context.run(checkForNewChannelsAndSubscribe(), 0, 5, SECONDS);
+    }
+
+    private ExRunnable checkForNewChannelsAndSubscribe() {
+        return () -> NanoBase.EVENT_TYPES.keySet().forEach(channelId -> {
+            if (subscribedChannels.add(channelId)) {
+                context.subscribeEvent(channelId, this::recordEvent);
+            }
+        });
     }
 
     @Override
@@ -75,16 +72,16 @@ public class DevConsoleService extends Service {
     private void recordEvent(Event event) {
         if(event.channelId() == EVENT_APP_HEARTBEAT)
             return;
-        synchronized (lock) {
-            if (eventHistory.size() >= maxEvents) {
-                eventHistory.removeLast();
-            }
-            eventHistory.addFirst(EventWrapper.builder()
-                    .event(event)
-                    .timestamp(Instant.now())
-                    //   .sourceService(event.asString("source")) TODO: Get event source
-                    .build());
+        lock.lock();
+        if (eventHistory.size() >= maxEvents) {
+            eventHistory.removeLast();
         }
+        eventHistory.addFirst(EventWrapper.builder()
+            .event(event)
+            .timestamp(Instant.now())
+            //   .sourceService(event.asString("source")) TODO: Get event source
+            .build());
+        lock.unlock();
     }
 
     @Override
@@ -92,7 +89,7 @@ public class DevConsoleService extends Service {
         event.payloadOpt(HttpObject.class).ifPresent(request -> {
             if (request.pathMatch(DEV_INFO_PATH)) {
                 event.acknowledge();
-                String systemInfoJson = formatToJson(getSystemInfo());
+                String systemInfoJson = JsonEncoder.toJson(getSystemInfo()); // formatToJson(getSystemInfo());
                 request.response()
                         .statusCode(200)
                         .header("Content-Type", "application/json")
@@ -103,7 +100,7 @@ public class DevConsoleService extends Service {
 
             if (request.pathMatch(DEV_EVENTS_PATH)) {
                 event.acknowledge();
-                String eventsJson = formatListToJsonArray(getEventList());
+                String eventsJson = JsonEncoder.toJson(getEventList());
                 request.response()
                         .statusCode(200)
                         .header("Content-Type", "application/json")
@@ -132,46 +129,6 @@ public class DevConsoleService extends Service {
                 }
             }
         });
-    }
-
-    /**
-     * Formats a map into a JSON string.
-     *
-     * @param inputMap < String, Object> The record to format.
-     * @return The map as a JSON string.
-     */
-    private String formatToJson(final Map<String, Object> inputMap) {
-        return "{" + inputMap.entrySet().stream()
-                .map(entry -> "\"" + escapeJson(entry.getKey()) + "\":" + toJsonValue(entry.getValue()))
-                .collect(Collectors.joining(",")) + "}";
-    }
-
-    private String toJsonValue(Object value) {
-        if (value == null) {
-            return "null";
-        } else if (value instanceof Number || value instanceof Boolean) {
-            return value.toString();
-        } else if (value instanceof Map) {
-            return formatToJson((Map<String, Object>) value);
-        } else {
-            return "\"" + escapeJson(value.toString()) + "\"";
-        }
-    }
-
-    private String escapeJson(String str) {
-        return str
-                .replace("\\", "\\\\")
-                .replace("\"", "\\\"")
-                .replace("\n", "\\n")
-                .replace("\r", "\\r")
-                .replace("\t", "\\t");
-    }
-
-    private String formatListToJsonArray(final List<Map<String, Object>> inputList) {
-        return "[" + inputList.stream()
-                .map(this::formatToJson)
-                .collect(Collectors.joining(","))
-                + "]";
     }
 
     @Override
