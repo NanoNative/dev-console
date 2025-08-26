@@ -1,0 +1,15 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenLocal()
+}
+
+dependencies {
+    compileOnly libs.org.nanonative.nano
+}
+
+group = 'org.nanonative.ab'
+version = '1.0.0-SNAPSHOT'
+description = 'Dev Console for Nano'

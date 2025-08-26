@@ -42,7 +42,7 @@ common/cdk.out
 .venv
 __pycache__
 *.bat
-
+!gradlew.bat
 /cc-reporter*
 /public-key.asc
 
