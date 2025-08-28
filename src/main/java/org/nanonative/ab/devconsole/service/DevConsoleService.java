@@ -11,6 +11,7 @@ import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -41,6 +42,18 @@ public class DevConsoleService extends Service {
     private final String DEFAULT_PATH = "/dev-console/ui";
     private final String DEV_EVENTS_PATH = "/dev-console/events";
     private final String DEV_INFO_PATH = "/dev-console/system-info";
+
+    private static final String INDEX_HTML;
+
+    static {
+        try (InputStream in = Objects.requireNonNull(
+            DevConsoleService.class.getResourceAsStream("/index.html"),
+            "index.html not found in resources")) {
+            INDEX_HTML = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load index.html", e);
+        }
+    }
 
     @Override
     public void start() {
@@ -105,23 +118,11 @@ public class DevConsoleService extends Service {
             }
             if (request.pathMatch(basePath)) {
                 event.acknowledge();
-                try (InputStream in = getClass().getClassLoader().getResourceAsStream("index.html")) {
-                    if (in == null) {
-                        request.response().statusCode(404).body("UI not found").respond(event);
-                        return;
-                    }
-
-                    String html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-
-                    request.response()
-                            .statusCode(200)
-                            .header("Content-Type", "text/html")
-                            .body(html)
-                            .respond(event);
-
-                } catch (IOException e) {
-                    request.response().statusCode(500).body("Error loading UI").respond(event);
-                }
+                request.response()
+                    .statusCode(200)
+                    .header("Content-Type", "text/html")
+                    .body(INDEX_HTML)
+                    .respond(event);
             }
         });
     }
