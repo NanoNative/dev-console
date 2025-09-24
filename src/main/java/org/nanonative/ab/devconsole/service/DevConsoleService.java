@@ -7,11 +7,13 @@ import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
 import org.nanonative.nano.helper.ExRunnable;
 import org.nanonative.nano.helper.event.model.Event;
+import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.UncheckedIOException;
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -26,15 +28,17 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 import berlin.yuna.typemap.logic.JsonEncoder;
 import berlin.yuna.typemap.model.ConcurrentTypeSet;
-import org.nanonative.nano.services.logging.LogService;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
-import static  org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
+import static org.nanonative.ab.devconsole.util.ResponseHelper.problem;
+import static org.nanonative.ab.devconsole.util.ResponseHelper.responseOk;
+import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
 import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
+import static org.nanonative.nano.services.http.HttpServer.EVENT_HTTP_REQUEST;
+import static org.nanonative.nano.services.logging.LogService.EVENT_LOGGING;
 
 public class DevConsoleService extends Service {
 
-    // All modifications to eventHistory must be thread safe
     private final Deque<EventWrapper> eventHistory = new ConcurrentLinkedDeque<>();
     private final Deque<Object> logHistory = new ConcurrentLinkedDeque<>();
     private final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
@@ -43,50 +47,49 @@ public class DevConsoleService extends Service {
     private Integer maxEvents;
     private String basePath;
     private final int DEFAULT_MAX_EVENTS = 1000;
-    private final String DEFAULT_PATH = "/dev-console/ui/";
-    private final String DEV_EVENTS_PATH = "/dev-console/events";
-    private final String DEV_INFO_PATH = "/dev-console/system-info";
-    private final String LOGS_PATH = "/dev-console/logs";
-    private final String CSS_PATH = "/style.css";
-    private final String JS_PATH = "/script.js";
+    private final String baseUrl = "/dev-console";
+    private final String DEFAULT_URL = "/dev-console/ui";
+    private final String DEV_EVENTS_URL = "/dev-console/events";
+    private final String DEV_INFO_URL = "/dev-console/system-info";
+    private final String DEV_LOGS_URL = "/dev-console/logs";
+    private static final String HTML_PATH = "/index.html";
+    private static final String CSS_PATH = "/style.css";
+    private static final String JS_PATH = "/script.js";
 
     private static final Map<String, String> STATIC_FILES = new HashMap<>();
 
-    private static void loadStaticFile(String path, String baseUrl) {
-        try (InputStream in = Objects.requireNonNull(
+    private static void loadStaticFile(String path) throws IOException {
+        InputStream in = Objects.requireNonNull(
             DevConsoleService.class.getResourceAsStream(path),
-            path + " not found in resources")) {
-            String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-
-            if (path.contains("index.html")) {
-                content = content.replace("{{BASE_URL}}", baseUrl);
-            }
-            STATIC_FILES.put(path, content);
-        } catch (IOException e) {
-            throw new UncheckedIOException("Failed to load " + path, e);
-        }
+            String.format("%s not found in resources", path));
+        String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        STATIC_FILES.put(path, content);
     }
 
     @Override
     public void start() {
-        loadStaticFile("/index.html", basePath);
-        loadStaticFile("/style.css", basePath);
-        loadStaticFile("/script.js", basePath);
-        context.info(() -> "[" + name() + "] started at " + basePath);
+        try {
+            loadStaticFile(HTML_PATH);
+            loadStaticFile(CSS_PATH);
+            loadStaticFile(JS_PATH);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
         context.run(checkForNewChannelsAndSubscribe(), 0, 5, SECONDS);
+        context.info(() -> "[{}] started at {} ", name(), basePath);
     }
 
     private ExRunnable checkForNewChannelsAndSubscribe() {
-        return () -> NanoBase.EVENT_TYPES.keySet().forEach(channelId -> {
-            if (channelId != EVENT_APP_HEARTBEAT && subscribedChannels.add(channelId)) {
-                context.subscribeEvent(channelId, this::recordEvent);
+        return () -> NanoBase.EVENT_CHANNELS.values().forEach(channel -> {
+            if (channel != EVENT_APP_HEARTBEAT && subscribedChannels.add(channel)) {
+                context.subscribeEvent(channel, this::recordEvent);
             }
         });
     }
 
     @Override
     public void stop() {
-        context.info(() -> "[" + name() + "] stopped.");
+        context.info(() -> "[{}] stopped.", name());
     }
 
     @Override
@@ -94,141 +97,159 @@ public class DevConsoleService extends Service {
         return null;
     }
 
-    private void recordEvent(Event event) {
+    private void recordEvent(Event<?, ?> event) {
         if (eventHistory.size() >= maxEvents) {
             eventHistory.removeLast();
         }
-        eventHistory.addFirst(EventWrapper.builder()
-            .event(event)
-            .timestamp(Instant.now())
-            //   .sourceService(event.asString("source")) TODO: Get event source
-            .build());
-    }
+        eventHistory.addFirst(new EventWrapper(event, Instant.now()));
 
-    private void recordLog(Event event) {
-        if (logHistory.size() >= maxEvents) {
-            logHistory.removeLast();
-        }
-        logHistory.addFirst(event.payload());
+        // Preserve logs in memory
+        event.channel(EVENT_LOGGING).ifPresent(ev -> {
+                if (logHistory.size() >= maxEvents) {
+                    logHistory.removeLast();
+                }
+                logHistory.addFirst(ev.payload());
+            });
     }
 
     @Override
-    public void onEvent(Event event) {
-        event.filter(e -> e.channelId() == LogService.EVENT_LOGGING).ifPresent(this::recordLog);
-        event.payloadOpt(HttpObject.class).ifPresent(request -> {
-            if (request.pathMatch(LOGS_PATH)) {
-                event.acknowledge();
-                context.info(() -> "Logs endpoint invoked");
-                String logJson = JsonEncoder.toJson(logHistory);
-                request.response()
-                    .statusCode(200)
-                    .header("Content-Type", "application/json")
-                    .body(logJson)
-                    .respond(event);
-            } else if (request.pathMatch(DEV_INFO_PATH)) {
-                event.acknowledge();
-                String systemInfoJson = JsonEncoder.toJson(getSystemInfo());
-                context.info(() -> "Dev info endpoint invoked");
-                request.response()
-                        .statusCode(200)
-                        .header("Content-Type", "application/json")
-                        .body(systemInfoJson)
-                        .respond(event);
-            } else if (request.pathMatch(DEV_EVENTS_PATH)) {
-                event.acknowledge();
-                String eventsJson = JsonEncoder.toJson(getEventList());
-                context.info(() -> "Events endpoint invoked");
-                request.response()
-                        .statusCode(200)
-                        .header("Content-Type", "application/json")
-                        .body(eventsJson)
-                        .respond(event);
-            } else if (request.pathMatch(basePath + CSS_PATH)) {
-                event.acknowledge();
-                context.info(() -> "Styles endpoint invoked");
-                request.response()
-                    .statusCode(200)
-                    .header("Content-Type", "text/css")
-                    .body(STATIC_FILES.get("/style.css"))
-                    .respond(event);
-            } else if (request.pathMatch(basePath + JS_PATH)) {
-                event.acknowledge();
-                context.info(() -> "Js endpoint invoked");
-                request.response()
-                    .statusCode(200)
-                    .header("Content-Type", "application/javascript")
-                    .body(STATIC_FILES.get("/script.js"))
-                    .respond(event);
-            } else if (request.pathMatch(basePath)) {
-                event.acknowledge();
-                String resourcePath = "/index.html";
-                context.info(() -> "Dev console UI invoked");
-                String content = STATIC_FILES.get(resourcePath);
-                if (content == null) {
-                    request.response()
-                        .statusCode(404)
-                        .body("Not found: " + resourcePath)
-                        .respond(event);
-                }
-                request.response()
-                    .statusCode(200)
-                    .header("Content-Type", "text/html")
-                    .body(content)
-                    .respond(event);
-            }
-        });
+    public void onEvent(Event<?, ?> event) {
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(DEV_LOGS_URL)).ifPresent(this::fetchSystemLogs);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(DEV_INFO_URL)).ifPresent(this::fetchSystemInfo);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(DEV_EVENTS_URL)).ifPresent(this::fetchSystemEvents);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(baseUrl + CSS_PATH)).ifPresent(DevConsoleService::fetchCss);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(baseUrl + JS_PATH)).ifPresent(DevConsoleService::fetchJs);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(basePath)).ifPresent(DevConsoleService::fetchHtml);
     }
+
 
     @Override
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
-        this.maxEvents = merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS);
-        this.basePath  = merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElseGet(() -> DEFAULT_PATH);
+        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
+        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_URL));
     }
 
-    private List<Map<String, Object>> getEventList() {
-        List<Map<String, Object>> eventList = new ArrayList<>();
+    private String buildEventList() {
+        StringWriter stringWriter = new StringWriter();
+        PrintWriter out = new PrintWriter(stringWriter);
+        out.print("[");
+
+        boolean first = true;
         for (EventWrapper e : eventHistory) {
-            eventList.add(Map.of(
-                    "channel", Objects.toString(e.getEvent() != null ? e.getEvent().channel() : "UNKNOWN"),
-                    "isAck", e.getEvent() != null && e.getEvent().isAcknowledged(),
-                    "eventTimestamp", Objects.toString(e.getTimestamp(), Instant.EPOCH.toString()),
-                    "devEventId", Objects.toString(e.getEvent() != null ? e.getEvent().asUUID() : "N/A"),
-                    "parentChannel", Objects.toString(
-                            NanoBase.EVENT_TYPES.get(e.getEvent() != null ? e.getEvent().channelIdOrg() : null),
-                            "UNKNOWN"
-                    ),
-                    "payload", e.getEvent() != null
-                            ? e.getEvent().payloadOpt(Object.class).orElse("NONE")
-                            : "NONE"
-            ));
+            if (!first) {
+                out.print(",");
+            } else {
+                first = false;
+            }
+
+            Map<String, Object> eventMap = Map.of(
+                "channel", e.event().channel().name(),
+                "isAck", e.event().isAcknowledged(),
+                "isBroadcast", e.event().isBroadcast(),
+                "eventTimestamp", Objects.toString(e.timestamp(), Instant.EPOCH.toString()),
+                "payload", e.event().payload() != null ? e.event().payload() : "",
+                "response", e.event().response() != null ? e.event().response() : ""
+            );
+            out.print(JsonEncoder.toJson(eventMap));
         }
-        return eventList;
+
+        out.print("]");
+        out.flush();
+        return String.valueOf(stringWriter);
     }
 
     private Map<String, Object> getSystemInfo() {
         final Map<String, Object> info = Map.ofEntries(
-                Map.entry("pid", context.nano().pid()),
-                Map.entry("usedMemory", context.nano().usedMemoryMB() + " MB"),
-                Map.entry("services", context.services().size()),
-                Map.entry("serviceNames", context.services().stream().map(Service::name).toList()),
-                Map.entry("schedulers", context.nano().schedulers().size()),
-                Map.entry("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum()),
-                Map.entry("heapMemory", context.nano().heapMemoryUsage()),
-                Map.entry("os", System.getProperty("os.name") + " - " + System.getProperty("os.version")),
-                Map.entry("arch", System.getProperty("os.arch")),
-                Map.entry("java", System.getProperty("java.version")),
-                Map.entry("cores", Runtime.getRuntime().availableProcessors()),
-                Map.entry("threadsNano", NanoThread.activeNanoThreads()),
-                Map.entry("threadsActive", NanoThread.activeCarrierThreads()),
-                Map.entry("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads()),
-                Map.entry("host", context.nano().hostname()),
-                Map.entry("timestamp", Instant.now().toString())
+            Map.entry("pid", context.nano().pid()),
+            Map.entry("usedMemory", context.nano().usedMemoryMB() + " MB"),
+            Map.entry("services", context.services().size()),
+            Map.entry("serviceNames", context.services().stream().map(Service::name).toList()),
+            Map.entry("schedulers", context.nano().schedulers().size()),
+            Map.entry("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum()),
+            Map.entry("heapMemory", context.nano().heapMemoryUsage()),
+            Map.entry("os", System.getProperty("os.name") + " - " + System.getProperty("os.version")),
+            Map.entry("arch", System.getProperty("os.arch")),
+            Map.entry("java", System.getProperty("java.version")),
+            Map.entry("cores", Runtime.getRuntime().availableProcessors()),
+            Map.entry("threadsNano", NanoThread.activeNanoThreads()),
+            Map.entry("threadsActive", NanoThread.activeCarrierThreads()),
+            Map.entry("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads()),
+            //   Map.entry("host", context.nano().hostname()),
+            Map.entry("timestamp", Instant.now().toString())
         );
         return info;
     }
 
+    private void fetchSystemLogs(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = JsonEncoder.toJson(logHistory);
+                if (content == null) {
+                    event.respond(problem(request, 404, "Logs failed to load..."));
+                    return;
+                }
+                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
+            });
+    }
+
+    private void fetchSystemInfo(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = JsonEncoder.toJson(getSystemInfo());
+                if (content == null) {
+                    event.respond(problem(request, 404, "System Info failed to load..."));
+                    return;
+                }
+                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
+            });
+    }
+
+    private void fetchSystemEvents(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = buildEventList();
+                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
+            });
+    }
+
+    private static void fetchJs(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = STATIC_FILES.get(JS_PATH);
+                if (content == null) {
+                    event.respond(problem(request, 404, String.format("Not found: %s", JS_PATH)));
+                    return;
+                }
+                event.respond(responseOk(request, content, ContentType.APPLICATION_JAVASCRIPT));
+            });
+    }
+
+    private static void fetchCss(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = STATIC_FILES.get(CSS_PATH);
+                if (content == null) {
+                    event.respond(problem(request, 404, String.format("Not found: %s", CSS_PATH)));
+                    return;
+                }
+                event.respond(responseOk(request, content, ContentType.TEXT_CSS));
+            });
+    }
+
+    private static void fetchHtml(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = STATIC_FILES.get(HTML_PATH);
+                if (content == null) {
+                    event.respond(problem(request, 404, String.format("Not found: %s", HTML_PATH)));
+                    return;
+                }
+                event.respond(responseOk(request, content, ContentType.TEXT_HTML));
+            });
+    }
+
     public List<EventWrapper> getEventHistory() {
-        // send a copy of the LinkedList to be used by external services
+        // send a copy of current eventHistory - to be used by external services
         return new ArrayList<>(eventHistory);
     }
 }

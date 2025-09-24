@@ -16,7 +16,7 @@
         <dependency>
             <groupId>org.nanonative</groupId>
             <artifactId>nano</artifactId>
-            <version>2025.0.15</version>
+            <version>2025.1.3</version>
             <scope>provided</scope>
         </dependency>
     </dependencies>

@@ -6,16 +6,13 @@ The **Nano Dev Console** is a lightweight service that can be integrated into an
 
 ## Importing the Dependency
 
-Run `mvn clean install` or `./gradlew clean build` from the root of this project. Once the artifact is installed in local Maven repository, it can be added as a dependency in your Nano application like below:
+Run `mvn clean install` from the root of this project. Once the artifact is installed in local Maven repository, it can be added as a dependency in your Nano application like below:
 ### Maven
 <dependency>
     <groupId>org.nanonative.ab</groupId>
     <artifactId>nano-dev-console</artifactId>
     <version>1.0.0-SNAPSHOT</version>
 </dependency>
-
-### Gradle
-implementation "org.nanonative.ab:nano-dev-console:1.0.0-SNAPSHOT"
 
 ---
 
