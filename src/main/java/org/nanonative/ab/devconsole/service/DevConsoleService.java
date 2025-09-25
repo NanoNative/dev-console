@@ -1,5 +1,7 @@
 package org.nanonative.ab.devconsole.service;
 
+import berlin.yuna.typemap.model.LinkedTypeMap;
+import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMapI;
 import org.nanonative.ab.devconsole.model.EventWrapper;
 import org.nanonative.nano.core.NanoBase;
@@ -12,8 +14,6 @@ import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -28,6 +28,7 @@ import java.util.concurrent.ConcurrentLinkedDeque;
 
 import berlin.yuna.typemap.logic.JsonEncoder;
 import berlin.yuna.typemap.model.ConcurrentTypeSet;
+import org.nanonative.nano.services.logging.LogFormatRegister;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.nanonative.ab.devconsole.util.ResponseHelper.problem;
@@ -108,7 +109,7 @@ public class DevConsoleService extends Service {
                 if (logHistory.size() >= maxEvents) {
                     logHistory.removeLast();
                 }
-                logHistory.addFirst(ev.payload());
+                logHistory.addFirst(LogFormatRegister.getLogFormatter("console").format(ev.payload()));
             });
     }
 
@@ -130,54 +131,37 @@ public class DevConsoleService extends Service {
     }
 
     private String buildEventList() {
-        StringWriter stringWriter = new StringWriter();
-        PrintWriter out = new PrintWriter(stringWriter);
-        out.print("[");
-
-        boolean first = true;
+        TypeList eventsList = new TypeList();
         for (EventWrapper e : eventHistory) {
-            if (!first) {
-                out.print(",");
-            } else {
-                first = false;
-            }
-
-            Map<String, Object> eventMap = Map.of(
-                "channel", e.event().channel().name(),
-                "isAck", e.event().isAcknowledged(),
-                "isBroadcast", e.event().isBroadcast(),
-                "eventTimestamp", Objects.toString(e.timestamp(), Instant.EPOCH.toString()),
-                "payload", e.event().payload() != null ? e.event().payload() : "",
-                "response", e.event().response() != null ? e.event().response() : ""
-            );
-            out.print(JsonEncoder.toJson(eventMap));
+            LinkedTypeMap eventMap = new LinkedTypeMap()
+                .putR("channel", e.event().channel().name())
+                .putR("isAck", e.event().isAcknowledged())
+                .putR("isBroadcast", e.event().isBroadcast())
+                .putR("eventTimestamp", Objects.toString(e.timestamp(), Instant.EPOCH.toString()))
+                .putR("payload", e.event().payload() != null ? (String.valueOf(e.event().payload()).length() > 256 ? String.valueOf(e.event().payload()).substring(0, 256) + "…" : String.valueOf(e.event().payload())) : "")
+                .putR("response", e.event().response() != null ? (String.valueOf(e.event().response()).length() > 256 ? String.valueOf(e.event().response()).substring(0, 256) + "…" : String.valueOf(e.event().response())) : "");
+            eventsList.add(eventMap);
         }
-
-        out.print("]");
-        out.flush();
-        return String.valueOf(stringWriter);
+        return eventsList.toJson();
     }
 
-    private Map<String, Object> getSystemInfo() {
-        final Map<String, Object> info = Map.ofEntries(
-            Map.entry("pid", context.nano().pid()),
-            Map.entry("usedMemory", context.nano().usedMemoryMB() + " MB"),
-            Map.entry("services", context.services().size()),
-            Map.entry("serviceNames", context.services().stream().map(Service::name).toList()),
-            Map.entry("schedulers", context.nano().schedulers().size()),
-            Map.entry("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum()),
-            Map.entry("heapMemory", context.nano().heapMemoryUsage()),
-            Map.entry("os", System.getProperty("os.name") + " - " + System.getProperty("os.version")),
-            Map.entry("arch", System.getProperty("os.arch")),
-            Map.entry("java", System.getProperty("java.version")),
-            Map.entry("cores", Runtime.getRuntime().availableProcessors()),
-            Map.entry("threadsNano", NanoThread.activeNanoThreads()),
-            Map.entry("threadsActive", NanoThread.activeCarrierThreads()),
-            Map.entry("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads()),
-            //   Map.entry("host", context.nano().hostname()),
-            Map.entry("timestamp", Instant.now().toString())
-        );
-        return info;
+    private LinkedTypeMap getSystemInfo() {
+        return new LinkedTypeMap()
+            .putR("pid", context.nano().pid())
+            .putR("usedMemory", context.nano().usedMemoryMB() + " MB")
+            .putR("services", context.services().size())
+            .putR("serviceNames", context.services().stream().map(Service::name).toList())
+            .putR("schedulers", context.nano().schedulers().size())
+            .putR("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum())
+            .putR("heapMemory", context.nano().heapMemoryUsage())
+            .putR("os", System.getProperty("os.name") + " - " + System.getProperty("os.version"))
+            .putR("arch", System.getProperty("os.arch"))
+            .putR("java", System.getProperty("java.version"))
+            .putR("cores", Runtime.getRuntime().availableProcessors())
+            .putR("threadsNano", NanoThread.activeNanoThreads())
+            .putR("threadsActive", NanoThread.activeCarrierThreads())
+            .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
+            .putR("timestamp", JsonEncoder.toJson(Instant.now()));
     }
 
     private void fetchSystemLogs(Event<HttpObject, HttpObject> event) {
