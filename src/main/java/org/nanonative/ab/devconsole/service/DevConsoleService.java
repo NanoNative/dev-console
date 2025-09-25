@@ -126,26 +126,26 @@ public class DevConsoleService extends Service {
         event.channel(EVENT_HTTP_REQUEST).ifPresent(ev ->
             ev.payloadOpt()
                 .filter(HttpObject::isMethodGet)
-                .filter(request -> request.pathMatch(BASE_URL + "/{fileName}"))
-                .map(request -> request.pathParam("fileName"))
-                .filter(STATIC_FILES::containsKey)
-                .ifPresentOrElse(fileName -> ev.respond(responseOk(ev.payload(), STATIC_FILES.get(fileName), getTypeFromFileExt(fileName))),
+                .filter(request -> request.pathMatch(BASE_URL + DEV_INFO_URL))
+                .ifPresentOrElse(request -> ev.respond(responseOk(request, JsonEncoder.toJson(getSystemInfo()), ContentType.APPLICATION_JSON)),
                     () -> ev.payloadOpt()
                         .filter(HttpObject::isMethodGet)
-                        .filter(request -> request.pathMatch(BASE_URL + basePath))
-                        .ifPresentOrElse(request -> ev.respond(responseOk(ev.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML)),
+                        .filter(request -> request.pathMatch(BASE_URL + DEV_EVENTS_URL))
+                        .ifPresentOrElse(request -> ev.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON)),
                             () -> ev.payloadOpt()
                                 .filter(HttpObject::isMethodGet)
-                                .filter(request -> request.pathMatch(BASE_URL + DEV_EVENTS_URL))
-                                .ifPresentOrElse(request -> ev.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON)),
+                                .filter(request -> request.pathMatch(BASE_URL + DEV_LOGS_URL))
+                                .ifPresentOrElse(request -> ev.respond(responseOk(request, JsonEncoder.toJson(logHistory), ContentType.APPLICATION_JSON)),
                                     () -> ev.payloadOpt()
                                         .filter(HttpObject::isMethodGet)
-                                        .filter(request -> request.pathMatch(BASE_URL + DEV_LOGS_URL))
-                                        .ifPresentOrElse(request -> ev.respond(responseOk(request, JsonEncoder.toJson(logHistory), ContentType.APPLICATION_JSON)),
+                                        .filter(request -> request.pathMatch(BASE_URL + basePath))
+                                        .ifPresentOrElse(request -> ev.respond(responseOk(ev.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML)),
                                             () -> ev.payloadOpt()
                                                 .filter(HttpObject::isMethodGet)
-                                                .filter(request -> request.pathMatch(BASE_URL + DEV_INFO_URL))
-                                                .ifPresentOrElse(request -> ev.respond(responseOk(request, JsonEncoder.toJson(getSystemInfo()), ContentType.APPLICATION_JSON)),
+                                                .filter(request -> request.pathMatch(BASE_URL + "/{fileName}"))
+                                                .map(request -> request.pathParam("fileName"))
+                                                .filter(STATIC_FILES::containsKey)
+                                                .ifPresentOrElse(fileName -> ev.respond(responseOk(ev.payload(), STATIC_FILES.get(fileName), getTypeFromFileExt(fileName))),
                                                     () -> ev.respond(problem(ev.payload(), 404, "Unknown Universe"))))))));
     }
 
