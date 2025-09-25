@@ -161,7 +161,7 @@ public class DevConsoleService extends Service {
             .putR("threadsNano", NanoThread.activeNanoThreads())
             .putR("threadsActive", NanoThread.activeCarrierThreads())
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
-            .putR("timestamp", JsonEncoder.toJson(Instant.now()));
+            .putR("timestamp", String.valueOf(Instant.now()));
     }
 
     private void fetchSystemLogs(Event<HttpObject, HttpObject> event) {
