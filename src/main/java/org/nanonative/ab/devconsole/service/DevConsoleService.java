@@ -42,7 +42,8 @@ import static org.nanonative.nano.services.logging.LogService.EVENT_LOGGING;
 public class DevConsoleService extends Service {
 
     // Static final config keys
-    public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in the DevConsoleService");
+    public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in memory");
+    public static final String CONFIG_DEV_CONSOLE_MAX_LOGS = registerConfig("dev_console_max_logs", "Max number of logs to retain in memory");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
 
     // Static UI resource paths
@@ -52,6 +53,7 @@ public class DevConsoleService extends Service {
     // Final constants
     private final String BASE_URL = "/dev-console";
     private final int DEFAULT_MAX_EVENTS = 1000;
+    private final int DEFAULT_MAX_LOGS = 1000;
     private final String DEFAULT_UI_URL = "/ui";
     private final String DEV_EVENTS_URL = "/events";
     private final String DEV_INFO_URL = "/system-info";
@@ -60,6 +62,7 @@ public class DevConsoleService extends Service {
     // Configurable fields
     private String basePath;
     private Integer maxEvents;
+    private Integer maxLogs;
 
     // Data structures
     private static final Map<String, String> STATIC_FILES = new HashMap<>();
@@ -110,7 +113,7 @@ public class DevConsoleService extends Service {
 
         // Preserve logs in memory
         event.channel(EVENT_LOGGING).ifPresent(ev -> {
-            if (logHistory.size() >= maxEvents) {
+            if (logHistory.size() >= maxLogs) {
                 logHistory.removeLast();
             }
             logHistory.addFirst(LogFormatRegister.getLogFormatter("console").format(ev.payload()));
@@ -150,6 +153,7 @@ public class DevConsoleService extends Service {
     @Override
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
         this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
+        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
         this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
     }
 
