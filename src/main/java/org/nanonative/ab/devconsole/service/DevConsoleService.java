@@ -48,11 +48,11 @@ public class DevConsoleService extends Service {
     private Integer maxEvents;
     private String basePath;
     private final int DEFAULT_MAX_EVENTS = 1000;
-    private final String baseUrl = "/dev-console";
-    private final String DEFAULT_URL = "/dev-console/ui";
-    private final String DEV_EVENTS_URL = "/dev-console/events";
-    private final String DEV_INFO_URL = "/dev-console/system-info";
-    private final String DEV_LOGS_URL = "/dev-console/logs";
+    private final String BASE_URL = "/dev-console";
+    private final String DEFAULT_UI_URL = "/ui";
+    private final String DEV_EVENTS_URL = "/events";
+    private final String DEV_INFO_URL = "/system-info";
+    private final String DEV_LOGS_URL = "/logs";
     private static final String HTML_PATH = "/index.html";
     private static final String CSS_PATH = "/style.css";
     private static final String JS_PATH = "/script.js";
@@ -77,7 +77,7 @@ public class DevConsoleService extends Service {
             throw new RuntimeException(e);
         }
         context.run(checkForNewChannelsAndSubscribe(), 0, 5, SECONDS);
-        context.info(() -> "[{}] started at {} ", name(), basePath);
+        context.info(() -> "[{}] started at {} ", name(), BASE_URL +basePath);
     }
 
     private ExRunnable checkForNewChannelsAndSubscribe() {
@@ -115,19 +115,19 @@ public class DevConsoleService extends Service {
 
     @Override
     public void onEvent(Event<?, ?> event) {
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(DEV_LOGS_URL)).ifPresent(this::fetchSystemLogs);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(DEV_INFO_URL)).ifPresent(this::fetchSystemInfo);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(DEV_EVENTS_URL)).ifPresent(this::fetchSystemEvents);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(baseUrl + CSS_PATH)).ifPresent(DevConsoleService::fetchCss);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(baseUrl + JS_PATH)).ifPresent(DevConsoleService::fetchJs);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(basePath)).ifPresent(DevConsoleService::fetchHtml);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_LOGS_URL)).ifPresent(this::fetchSystemLogs);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_INFO_URL)).ifPresent(this::fetchSystemInfo);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_EVENTS_URL)).ifPresent(this::fetchSystemEvents);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + CSS_PATH)).ifPresent(DevConsoleService::fetchCss);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + JS_PATH)).ifPresent(DevConsoleService::fetchJs);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + basePath)).ifPresent(DevConsoleService::fetchHtml);
     }
 
 
     @Override
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
         this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
-        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_URL));
+        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
     }
 
     private String buildEventList() {
