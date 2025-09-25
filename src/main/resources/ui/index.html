@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Dev Console</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1>🚀 Nano Dev Console</h1>
+
+<h2>📊 Real-time Metrics</h2>
+<div class="charts-grid">
+    <div class="chart-container">
+        <canvas id="memoryChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="threadsChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="eventsChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="heapChart" width="300" height="200"></canvas>
+    </div>
+</div>
+
+<h2>💻 System Info</h2>
+<pre id="system"></pre>
+
+<div class="tabs">
+    <div class="tab active" data-tab="events">📡 Events</div>
+    <div class="tab" data-tab="logs">📝 Logs</div>
+</div>
+
+<div id="events" class="tab-content active">
+    <pre id="eventsData"></pre>
+</div>
+<div id="logs" class="tab-content">
+    <pre id="logsData"></pre>
+</div>
+
+<script src="charts.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

@@ -40,44 +40,50 @@ import static org.nanonative.nano.services.logging.LogService.EVENT_LOGGING;
 
 public class DevConsoleService extends Service {
 
-    private final Deque<EventWrapper> eventHistory = new ConcurrentLinkedDeque<>();
-    private final Deque<Object> logHistory = new ConcurrentLinkedDeque<>();
-    private final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
+    // Static final config keys
     public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in the DevConsoleService");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
-    private Integer maxEvents;
-    private String basePath;
-    private final int DEFAULT_MAX_EVENTS = 1000;
+
+    // Static UI resource paths
+    private static final String UI_BASE_DIR = "/ui";
+    private static final String UI_RESOURCE_FILE = "ui-files.txt";
+
+    // Final constants
     private final String BASE_URL = "/dev-console";
+    private final String CHARTS_PATH = "charts.js";
+    private final String CSS_PATH = "style.css";
+    private final int DEFAULT_MAX_EVENTS = 1000;
     private final String DEFAULT_UI_URL = "/ui";
     private final String DEV_EVENTS_URL = "/events";
     private final String DEV_INFO_URL = "/system-info";
     private final String DEV_LOGS_URL = "/logs";
-    private static final String HTML_PATH = "/index.html";
-    private static final String CSS_PATH = "/style.css";
-    private static final String JS_PATH = "/script.js";
+    private final String HTML_PATH = "index.html";
+    private final String JS_PATH = "script.js";
 
+    // Configurable fields
+    private String basePath;
+    private Integer maxEvents;
+
+    // Data structures
     private static final Map<String, String> STATIC_FILES = new HashMap<>();
+    private final Deque<EventWrapper> eventHistory = new ConcurrentLinkedDeque<>();
+    private final Deque<Object> logHistory = new ConcurrentLinkedDeque<>();
+    private final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
 
-    private static void loadStaticFile(String path) throws IOException {
-        InputStream in = Objects.requireNonNull(
-            DevConsoleService.class.getResourceAsStream(path),
-            String.format("%s not found in resources", path));
-        String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-        STATIC_FILES.put(path, content);
+    public List<EventWrapper> getEventHistory() {
+        // send a copy of current eventHistory - to be used by external services
+        return new ArrayList<>(eventHistory);
     }
 
     @Override
     public void start() {
         try {
-            loadStaticFile(HTML_PATH);
-            loadStaticFile(CSS_PATH);
-            loadStaticFile(JS_PATH);
+            loadStaticFiles();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
         context.run(checkForNewChannelsAndSubscribe(), 0, 5, SECONDS);
-        context.info(() -> "[{}] started at {} ", name(), BASE_URL +basePath);
+        context.info(() -> "[{}] started at {} ", name(), BASE_URL + basePath);
     }
 
     private ExRunnable checkForNewChannelsAndSubscribe() {
@@ -106,11 +112,11 @@ public class DevConsoleService extends Service {
 
         // Preserve logs in memory
         event.channel(EVENT_LOGGING).ifPresent(ev -> {
-                if (logHistory.size() >= maxEvents) {
-                    logHistory.removeLast();
-                }
-                logHistory.addFirst(LogFormatRegister.getLogFormatter("console").format(ev.payload()));
-            });
+            if (logHistory.size() >= maxEvents) {
+                logHistory.removeLast();
+            }
+            logHistory.addFirst(LogFormatRegister.getLogFormatter("console").format(ev.payload()));
+        });
     }
 
     @Override
@@ -118,9 +124,10 @@ public class DevConsoleService extends Service {
         event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_LOGS_URL)).ifPresent(this::fetchSystemLogs);
         event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_INFO_URL)).ifPresent(this::fetchSystemInfo);
         event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_EVENTS_URL)).ifPresent(this::fetchSystemEvents);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + CSS_PATH)).ifPresent(DevConsoleService::fetchCss);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + JS_PATH)).ifPresent(DevConsoleService::fetchJs);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + basePath)).ifPresent(DevConsoleService::fetchHtml);
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + "/" + CSS_PATH)).ifPresent(e -> fetchUiResources(e, CSS_PATH));
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + "/" + CHARTS_PATH)).ifPresent(e -> fetchUiResources(e, CHARTS_PATH));
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + "/" + JS_PATH)).ifPresent(e -> fetchUiResources(e, JS_PATH));
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + basePath)).ifPresent(e -> fetchUiResources(e, HTML_PATH));
     }
 
 
@@ -128,6 +135,38 @@ public class DevConsoleService extends Service {
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
         this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
         this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
+    }
+
+    private void fetchSystemLogs(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = JsonEncoder.toJson(logHistory);
+                if (content == null) {
+                    event.respond(problem(request, 404, "Logs failed to load..."));
+                    return;
+                }
+                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
+            });
+    }
+
+    private void fetchSystemInfo(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = JsonEncoder.toJson(getSystemInfo());
+                if (content == null) {
+                    event.respond(problem(request, 404, "System Info failed to load..."));
+                    return;
+                }
+                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
+            });
+    }
+
+    private void fetchSystemEvents(Event<HttpObject, HttpObject> event) {
+        event.payloadOpt().filter(HttpObject::isMethodGet)
+            .ifPresent(request -> {
+                String content = buildEventList();
+                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
+            });
     }
 
     private String buildEventList() {
@@ -164,76 +203,43 @@ public class DevConsoleService extends Service {
             .putR("timestamp", String.valueOf(Instant.now()));
     }
 
-    private void fetchSystemLogs(Event<HttpObject, HttpObject> event) {
+    private static void fetchUiResources(Event<HttpObject, HttpObject> event, String path) {
         event.payloadOpt().filter(HttpObject::isMethodGet)
             .ifPresent(request -> {
-                String content = JsonEncoder.toJson(logHistory);
+                String content = STATIC_FILES.get(path);
                 if (content == null) {
-                    event.respond(problem(request, 404, "Logs failed to load..."));
+                    event.respond(problem(request, 404, String.format("Not found: %s", path)));
                     return;
                 }
-                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
+                event.respond(responseOk(request, content, getContentType(path)));
             });
     }
 
-    private void fetchSystemInfo(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = JsonEncoder.toJson(getSystemInfo());
-                if (content == null) {
-                    event.respond(problem(request, 404, "System Info failed to load..."));
-                    return;
-                }
-                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
-            });
+    public static void loadStaticFiles() throws IOException {
+        List<String> fileNames = loadStaticFile("/" + UI_RESOURCE_FILE).lines().map(String::trim).filter(fileName -> !fileName.isBlank()).toList();
+        for (String file : fileNames) {
+            STATIC_FILES.put(file, loadStaticFile(file));
+        }
     }
 
-    private void fetchSystemEvents(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = buildEventList();
-                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
-            });
+    private static String loadStaticFile(String fileName) throws IOException {
+        InputStream in = Objects.requireNonNull(
+            DevConsoleService.class.getResourceAsStream(UI_BASE_DIR + "/" + fileName),
+            fileName + " not found in resources");
+        return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
 
-    private static void fetchJs(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = STATIC_FILES.get(JS_PATH);
-                if (content == null) {
-                    event.respond(problem(request, 404, String.format("Not found: %s", JS_PATH)));
-                    return;
-                }
-                event.respond(responseOk(request, content, ContentType.APPLICATION_JAVASCRIPT));
-            });
+    private static ContentType getContentType(String path) {
+        if (!path.contains(".")) {
+            return ContentType.TEXT_PLAIN;
+        }
+        String ext = path.substring(path.lastIndexOf('.') + 1).toLowerCase();
+        return switch (ext) {
+            case "html" -> ContentType.TEXT_HTML;
+            case "css" -> ContentType.TEXT_CSS;
+            case "js" -> ContentType.APPLICATION_JAVASCRIPT;
+            default -> ContentType.TEXT_PLAIN;
+        };
     }
 
-    private static void fetchCss(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = STATIC_FILES.get(CSS_PATH);
-                if (content == null) {
-                    event.respond(problem(request, 404, String.format("Not found: %s", CSS_PATH)));
-                    return;
-                }
-                event.respond(responseOk(request, content, ContentType.TEXT_CSS));
-            });
-    }
-
-    private static void fetchHtml(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = STATIC_FILES.get(HTML_PATH);
-                if (content == null) {
-                    event.respond(problem(request, 404, String.format("Not found: %s", HTML_PATH)));
-                    return;
-                }
-                event.respond(responseOk(request, content, ContentType.TEXT_HTML));
-            });
-    }
-
-    public List<EventWrapper> getEventHistory() {
-        // send a copy of current eventHistory - to be used by external services
-        return new ArrayList<>(eventHistory);
-    }
 }

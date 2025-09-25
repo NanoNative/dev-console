@@ -22,6 +22,16 @@
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.build.directory}/generated-resources</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.ec4j.maven</groupId>
@@ -41,6 +51,45 @@
                 <version>3.11.0</version>
                 <configuration>
                     <release>22</release>
+                </configuration>
+            </plugin>
+
+            <!-- Generate ui-files.txt (filenames from src/main/resources/ui) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>generate-ui-files-list</id>
+                        <phase>generate-resources</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/generated-resources/ui"/>
+
+                                <path id="ui.path">
+                                    <fileset dir="${project.basedir}/src/main/resources/ui">
+                                        <include name="*"/>
+                                    </fileset>
+                                </path>
+                                <pathconvert property="ui.files.list" refid="ui.path" pathsep="${line.separator}">
+                                    <mapper type="flatten"/>
+                                </pathconvert>
+                                <echo file="${project.build.directory}/generated-resources/ui/ui-files.txt"
+                                      encoding="UTF-8">${ui.files.list}</echo>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Uncomment the below plugin to run the Main in this project -->
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>org.nanonative.ab.devconsole.Main</mainClass>
                 </configuration>
             </plugin>
         </plugins>
