@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import berlin.yuna.typemap.logic.JsonEncoder;
 import berlin.yuna.typemap.model.ConcurrentTypeSet;
@@ -69,6 +70,7 @@ public class DevConsoleService extends Service {
     private final Deque<EventWrapper> eventHistory = new ConcurrentLinkedDeque<>();
     private final Deque<Object> logHistory = new ConcurrentLinkedDeque<>();
     private final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
+    private final AtomicInteger totalEvents = new AtomicInteger(0);
 
     public List<EventWrapper> getEventHistory() {
         // send a copy of current eventHistory - to be used by external services
@@ -117,6 +119,7 @@ public class DevConsoleService extends Service {
             }
             logHistory.addFirst(LogFormatRegister.getLogFormatter("console").format(ev.payload()));
         });
+        totalEvents.incrementAndGet();
     }
 
     @Override
@@ -200,7 +203,7 @@ public class DevConsoleService extends Service {
             .putR("threadsNano", NanoThread.activeNanoThreads())
             .putR("threadsActive", NanoThread.activeCarrierThreads())
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
-            .putR("totalEvents", eventHistory.size()) // context.nano().eventCount() - this does not seem to return the total event count
+            .putR("totalEvents", totalEvents.get())
             .putR("timestamp", String.valueOf(Instant.now()));
     }
 
