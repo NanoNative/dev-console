@@ -120,24 +120,30 @@ public class DevConsoleService extends Service {
 
     @Override
     public void onEvent(Event<?, ?> event) {
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_LOGS_URL)).ifPresent(this::fetchSystemLogs);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_INFO_URL)).ifPresent(this::fetchSystemInfo);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_EVENTS_URL)).ifPresent(this::fetchSystemEvents);
         event.channel(EVENT_HTTP_REQUEST).ifPresent(ev ->
             ev.payloadOpt()
                 .filter(HttpObject::isMethodGet)
                 .filter(request -> request.pathMatch(BASE_URL + "/{fileName}"))
                 .map(request -> request.pathParam("fileName"))
                 .filter(STATIC_FILES::containsKey)
-                .ifPresentOrElse(fileName ->
-                    fetchUiResources(ev, fileName),
-                    () ->
-                        ev.payloadOpt()
-                            .filter(HttpObject::isMethodGet)
-                            .filter(request -> request.pathMatch(BASE_URL + basePath))
-                            .ifPresent(request -> fetchUiResources(ev, "index.html"))
-                )
-        );
+                .ifPresentOrElse(fileName -> fetchUiResources(ev, fileName),
+                    () -> ev.payloadOpt()
+                        .filter(HttpObject::isMethodGet)
+                        .filter(request -> request.pathMatch(BASE_URL + basePath))
+                        .ifPresentOrElse(request -> fetchUiResources(ev, "index.html"),
+                            () -> ev.payloadOpt()
+                                .filter(HttpObject::isMethodGet)
+                                .filter(request -> request.pathMatch(BASE_URL + DEV_EVENTS_URL))
+                                .ifPresentOrElse(request -> ev.respond(responseOk(request, buildEventList(), ContentType.APPLICATION_JSON)),
+                                    () -> ev.payloadOpt()
+                                        .filter(HttpObject::isMethodGet)
+                                        .filter(request -> request.pathMatch(BASE_URL + DEV_LOGS_URL))
+                                        .ifPresentOrElse(request -> ev.respond(responseOk(request, JsonEncoder.toJson(logHistory), ContentType.APPLICATION_JSON)),
+                                            () -> ev.payloadOpt()
+                                                .filter(HttpObject::isMethodGet)
+                                                .filter(request -> request.pathMatch(BASE_URL + DEV_INFO_URL))
+                                                .ifPresentOrElse(request -> ev.respond(responseOk(request, JsonEncoder.toJson(getSystemInfo()), ContentType.APPLICATION_JSON)),
+                                                    () -> ev.respond(problem(ev.payload(), 404, "Unknown Universe"))))))));
     }
 
 
@@ -145,38 +151,6 @@ public class DevConsoleService extends Service {
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
         this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
         this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
-    }
-
-    private void fetchSystemLogs(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = JsonEncoder.toJson(logHistory);
-                if (content == null) {
-                    event.respond(problem(request, 404, "Logs failed to load..."));
-                    return;
-                }
-                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
-            });
-    }
-
-    private void fetchSystemInfo(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = JsonEncoder.toJson(getSystemInfo());
-                if (content == null) {
-                    event.respond(problem(request, 404, "System Info failed to load..."));
-                    return;
-                }
-                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
-            });
-    }
-
-    private void fetchSystemEvents(Event<HttpObject, HttpObject> event) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = buildEventList();
-                event.respond(responseOk(request, content, ContentType.APPLICATION_JSON));
-            });
     }
 
     private String buildEventList() {
