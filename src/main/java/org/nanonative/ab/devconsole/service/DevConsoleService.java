@@ -126,15 +126,15 @@ public class DevConsoleService extends Service {
                 .filter(request -> request.pathMatch(BASE_URL + "/{fileName}"))
                 .map(request -> request.pathParam("fileName"))
                 .filter(STATIC_FILES::containsKey)
-                .ifPresentOrElse(fileName -> fetchUiResources(ev, fileName),
+                .ifPresentOrElse(fileName -> ev.respond(responseOk(ev.payload(), STATIC_FILES.get(fileName), getTypeFromFileExt(fileName))),
                     () -> ev.payloadOpt()
                         .filter(HttpObject::isMethodGet)
                         .filter(request -> request.pathMatch(BASE_URL + basePath))
-                        .ifPresentOrElse(request -> fetchUiResources(ev, "index.html"),
+                        .ifPresentOrElse(request -> ev.respond(responseOk(ev.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML)),
                             () -> ev.payloadOpt()
                                 .filter(HttpObject::isMethodGet)
                                 .filter(request -> request.pathMatch(BASE_URL + DEV_EVENTS_URL))
-                                .ifPresentOrElse(request -> ev.respond(responseOk(request, buildEventList(), ContentType.APPLICATION_JSON)),
+                                .ifPresentOrElse(request -> ev.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON)),
                                     () -> ev.payloadOpt()
                                         .filter(HttpObject::isMethodGet)
                                         .filter(request -> request.pathMatch(BASE_URL + DEV_LOGS_URL))
@@ -153,7 +153,7 @@ public class DevConsoleService extends Service {
         this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
     }
 
-    private String buildEventList() {
+    private String getEventList() {
         TypeList eventsList = new TypeList();
         for (EventWrapper e : eventHistory) {
             LinkedTypeMap eventMap = new LinkedTypeMap()
@@ -186,18 +186,6 @@ public class DevConsoleService extends Service {
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
             .putR("totalEvents", totalEvents.get())
             .putR("timestamp", String.valueOf(Instant.now()));
-    }
-
-    private static void fetchUiResources(Event<HttpObject, HttpObject> event, String path) {
-        event.payloadOpt().filter(HttpObject::isMethodGet)
-            .ifPresent(request -> {
-                String content = STATIC_FILES.get(path);
-                if (content == null) {
-                    event.respond(problem(request, 404, "Not found: " + path));
-                    return;
-                }
-                event.respond(responseOk(request, content, getTypeFromFileExt(path)));
-            });
     }
 
     public static void loadStaticFiles() throws IOException {
