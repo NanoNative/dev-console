@@ -51,15 +51,11 @@ public class DevConsoleService extends Service {
 
     // Final constants
     private final String BASE_URL = "/dev-console";
-    private final String CHARTS_PATH = "charts.js";
-    private final String CSS_PATH = "style.css";
     private final int DEFAULT_MAX_EVENTS = 1000;
     private final String DEFAULT_UI_URL = "/ui";
     private final String DEV_EVENTS_URL = "/events";
     private final String DEV_INFO_URL = "/system-info";
     private final String DEV_LOGS_URL = "/logs";
-    private final String HTML_PATH = "index.html";
-    private final String JS_PATH = "script.js";
 
     // Configurable fields
     private String basePath;
@@ -127,10 +123,21 @@ public class DevConsoleService extends Service {
         event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_LOGS_URL)).ifPresent(this::fetchSystemLogs);
         event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_INFO_URL)).ifPresent(this::fetchSystemInfo);
         event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + DEV_EVENTS_URL)).ifPresent(this::fetchSystemEvents);
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + "/" + CSS_PATH)).ifPresent(e -> fetchUiResources(e, CSS_PATH));
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + "/" + CHARTS_PATH)).ifPresent(e -> fetchUiResources(e, CHARTS_PATH));
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + "/" + JS_PATH)).ifPresent(e -> fetchUiResources(e, JS_PATH));
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payload().pathMatch(BASE_URL + basePath)).ifPresent(e -> fetchUiResources(e, HTML_PATH));
+        event.channel(EVENT_HTTP_REQUEST).ifPresent(ev ->
+            ev.payloadOpt()
+                .filter(HttpObject::isMethodGet)
+                .filter(request -> request.pathMatch(BASE_URL + "/{fileName}"))
+                .map(request -> request.pathParam("fileName"))
+                .filter(STATIC_FILES::containsKey)
+                .ifPresentOrElse(fileName ->
+                    fetchUiResources(ev, fileName),
+                    () ->
+                        ev.payloadOpt()
+                            .filter(HttpObject::isMethodGet)
+                            .filter(request -> request.pathMatch(BASE_URL + basePath))
+                            .ifPresent(request -> fetchUiResources(ev, "index.html"))
+                )
+        );
     }
 
 
