@@ -200,6 +200,7 @@ public class DevConsoleService extends Service {
             .putR("threadsNano", NanoThread.activeNanoThreads())
             .putR("threadsActive", NanoThread.activeCarrierThreads())
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
+            .putR("totalEvents", eventHistory.size()) // context.nano().eventCount() - this does not seem to return the total event count
             .putR("timestamp", String.valueOf(Instant.now()));
     }
 
@@ -208,7 +209,7 @@ public class DevConsoleService extends Service {
             .ifPresent(request -> {
                 String content = STATIC_FILES.get(path);
                 if (content == null) {
-                    event.respond(problem(request, 404, String.format("Not found: %s", path)));
+                    event.respond(problem(request, 404, "Not found: " + path));
                     return;
                 }
                 event.respond(responseOk(request, content, getTypeFromFileExt(path)));
@@ -241,5 +242,4 @@ public class DevConsoleService extends Service {
             default -> ContentType.TEXT_PLAIN;
         };
     }
-
 }
