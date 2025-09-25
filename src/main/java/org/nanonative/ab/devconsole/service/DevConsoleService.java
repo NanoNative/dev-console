@@ -211,7 +211,7 @@ public class DevConsoleService extends Service {
                     event.respond(problem(request, 404, String.format("Not found: %s", path)));
                     return;
                 }
-                event.respond(responseOk(request, content, getContentType(path)));
+                event.respond(responseOk(request, content, getTypeFromFileExt(path)));
             });
     }
 
@@ -229,11 +229,11 @@ public class DevConsoleService extends Service {
         return new String(in.readAllBytes(), StandardCharsets.UTF_8);
     }
 
-    private static ContentType getContentType(String path) {
+    private static ContentType getTypeFromFileExt(String path) {
         if (!path.contains(".")) {
             return ContentType.TEXT_PLAIN;
         }
-        String ext = path.substring(path.lastIndexOf('.') + 1).toLowerCase();
+        String ext = path.substring(path.lastIndexOf('.') + 1);
         return switch (ext) {
             case "html" -> ContentType.TEXT_HTML;
             case "css" -> ContentType.TEXT_CSS;
