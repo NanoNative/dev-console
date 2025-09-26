@@ -21,6 +21,7 @@ Run `mvn clean install` from the root of this project. Once the artifact is inst
 The Dev Console supports two configurable properties that can be overridden:
 
 - **CONFIG_DEV_CONSOLE_MAX_EVENTS** - Specifies the maximum number of events to be retained in memory.
+- **CONFIG_DEV_CONSOLE_MAX_LOGS** - Specifies the maximum number of logs to be retained in memory.
 - **CONFIG_DEV_CONSOLE_URL** - Specifies the URL path where the Dev Console can be accessed. 
 Example config value for CONFIG_DEV_CONSOLE_URL: */alex* - The UI will be accessible at */dev-console/alex*
 If no configuration is provided, the default url is */dev-console/ui*

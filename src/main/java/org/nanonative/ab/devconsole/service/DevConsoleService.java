@@ -24,6 +24,7 @@ import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Formatter;
+import java.util.logging.LogRecord;
 
 import berlin.yuna.typemap.logic.JsonEncoder;
 import berlin.yuna.typemap.model.ConcurrentTypeSet;
@@ -72,6 +73,7 @@ public class DevConsoleService extends Service {
     @Override
     public void start() {
         try {
+            checkForNewChannelsAndSubscribe();
             loadStaticFiles();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -99,19 +101,18 @@ public class DevConsoleService extends Service {
     }
 
     protected void recordEvent(Event<?, ?> event) {
-        if (eventHistory.size() >= maxEvents) {
-            eventHistory.removeLast();
-        }
-        event.put("createdTs", Instant.now());
-        eventHistory.addFirst(event);
-
-        // Preserve logs in memory
-        event.channel(EVENT_LOGGING).ifPresent(ev -> {
+        if (!event.channel().equals(EVENT_LOGGING)) {
+            if (eventHistory.size() >= maxEvents) {
+                eventHistory.removeLast();
+            }
+            event.put("createdTs", Instant.now());
+            eventHistory.addFirst(event);
+        } else {
             if (logHistory.size() >= maxLogs) {
                 logHistory.removeLast();
             }
-            logHistory.addFirst(logFormatter.format(ev.payload()));
-        });
+            logHistory.addFirst(logFormatter.format((LogRecord) event.payload()));
+        }
         totalEvents.incrementAndGet();
     }
 
@@ -129,7 +130,6 @@ public class DevConsoleService extends Service {
     protected void handleHttpRequest(Event<HttpObject, HttpObject> event, HttpObject request) {
         if (request.pathMatch(BASE_URL + DEV_INFO_URL)) {
             event.respond(responseOk(request, JsonEncoder.toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
-            context.info(() -> "Console refreshed");
         } else if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) {
             event.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) {
