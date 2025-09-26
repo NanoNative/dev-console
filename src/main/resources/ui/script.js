@@ -1,4 +1,4 @@
-// Fetch JSON from backend and throw on non-OK responses
+// Fetch JSON from a URL and throw on non-OK responses
 async function fetchJson(url) {
     const response = await fetch(url);
     if (!response.ok) {
@@ -109,13 +109,154 @@ function updateChartsWithSystemInfo(systemInfo) {
     }
 }
 
-// Activate a tab by id and show its content panel
+// Activate a tab by id and show its content panel (loads config on demand)
 function openTab(tabId) {
     document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
     document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
     document.getElementById(tabId).classList.add('active');
+
+    // Load config on demand (no polling)
+    if (tabId === 'config') { loadConfig(); }
+}
+
+// Fetch current config once on opening the Config tab and populate the form
+async function loadConfig(){
+  try {
+    const cfg = await fetchJson('/dev-console/config');
+    const form = document.getElementById('configForm');
+    if (!form) return;
+
+    // Fill inputs
+    const maxEventsEl = document.getElementById('cfgMaxEvents');
+    const maxLogsEl   = document.getElementById('cfgMaxLogs');
+    const baseUrlEl   = document.getElementById('cfgBaseUrl');
+
+    maxEventsEl.value = (cfg?.maxEvents ?? '');
+    maxLogsEl.value   = (cfg?.maxLogs   ?? '');
+    baseUrlEl.value   = (cfg?.baseUrl   ?? '');
+
+    // Save original for diffing (store as strings for consistent comparisons)
+    form._originalConfig = {
+      maxEvents: String(cfg?.maxEvents ?? ''),
+      maxLogs:   String(cfg?.maxLogs   ?? ''),
+      baseUrl:   String(cfg?.baseUrl   ?? '')
+    };
+
+    // Recompute diff to set button state
+    computeConfigDiff();
+  } catch (e) {
+    showToast('error', 'Failed to load config');
+    console.error(e);
+  }
+}
+
+// --- Validation helpers (minimal) ---
+function setFieldError(inputEl, msg){
+  const field = inputEl?.closest('.field'); if (!field) return;
+  field.classList.add('error');
+  let em = field.querySelector('.error-msg');
+  if (!em) { em = document.createElement('div'); em.className = 'error-msg'; field.appendChild(em); }
+  em.textContent = msg || '';
+}
+function clearFieldError(inputEl){
+  const field = inputEl?.closest('.field'); if (!field) return;
+  field.classList.remove('error');
+  const em = field.querySelector('.error-msg'); if (em) em.remove();
+}
+const isPosIntStr = (s) => /^[1-9]\d*$/.test(s);          // >0 integers only
+const isBaseUrlOK = (s) => /^\/[^/]+$/.test(s);            // starts with "/" and no more slashes
+
+// Compute diff vs the original config; enable/disable Update button
+function computeConfigDiff(){
+  const form = document.getElementById('configForm'); if (!form) return {};
+  const original = form._originalConfig || {};
+  const draft = {
+    maxEvents: (document.getElementById('cfgMaxEvents')?.value ?? '').trim(),
+    maxLogs:   (document.getElementById('cfgMaxLogs')?.value ?? '').trim(),
+    baseUrl:   (document.getElementById('cfgBaseUrl')?.value ?? '').trim()
+  };
+
+  // Clear previous errors
+  const maxEventsEl = document.getElementById('cfgMaxEvents');
+  const maxLogsEl   = document.getElementById('cfgMaxLogs');
+  const baseUrlEl   = document.getElementById('cfgBaseUrl');
+  clearFieldError(maxEventsEl); clearFieldError(maxLogsEl); clearFieldError(baseUrlEl);
+
+  // Validate current values
+  let valid = true;
+  if (!isPosIntStr(draft.maxEvents)) { setFieldError(maxEventsEl, 'Enter a positive integer'); valid = false; }
+  if (!isPosIntStr(draft.maxLogs))   { setFieldError(maxLogsEl,   'Enter a positive integer'); valid = false; }
+  if (!isBaseUrlOK(draft.baseUrl))   { setFieldError(baseUrlEl,   'Must start with "/" and no other "/"'); valid = false; }
+
+  // Build changed map only when values differ from originals
+  const changed = {};
+  if (draft.maxEvents !== (original.maxEvents ?? '')) changed.maxEvents = parseInt(draft.maxEvents, 10);
+  if (draft.maxLogs   !== (original.maxLogs   ?? '')) changed.maxLogs   = parseInt(draft.maxLogs, 10);
+  if (draft.baseUrl   !== (original.baseUrl   ?? '')) changed.baseUrl   = draft.baseUrl;
+
+  const btn = document.getElementById('configUpdateBtn');
+  if (btn) btn.disabled = (Object.keys(changed).length === 0) || !valid;
+
+  // Cache the diff for submit
+  form._changed = changed;
+  return changed;
+}
+
+// Show a toast message (success or error) for 2 seconds
+function showToast(type, message){
+  const toast = document.getElementById('configToast');
+  if (!toast) return;
+  toast.textContent = message || '';
+  toast.classList.remove('error');
+  if (type === 'error') toast.classList.add('error');
+  toast.classList.add('show');
+  setTimeout(()=> toast.classList.remove('show'), 2000);
+}
+
+// Submit only changed keys to backend after a confirm dialog
+async function submitConfigUpdate(e){
+  e?.preventDefault?.();
+  const form = document.getElementById('configForm');
+  if (!form) return;
+
+  const changed = computeConfigDiff();
+  // Abort if no changes or invalid state (button disabled)
+  const btn = document.getElementById('configUpdateBtn');
+  if (!changed || Object.keys(changed).length === 0 || (btn && btn.disabled)) return;
+
+  if (!confirm('Update configuration?')) return;
+
+  try {
+    const resp = await fetch('/dev-console/config', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(changed)
+    });
+
+    if (!resp.ok) {
+      showToast('error', 'Update failed');
+      return;
+    }
+
+    // Success: set new originals (as strings), disable button, and toast
+    const current = {
+      maxEvents: document.getElementById('cfgMaxEvents')?.value ?? '',
+      maxLogs:   document.getElementById('cfgMaxLogs')?.value ?? '',
+      baseUrl:   document.getElementById('cfgBaseUrl')?.value ?? ''
+    };
+    form._originalConfig = {
+      maxEvents: String(current.maxEvents),
+      maxLogs:   String(current.maxLogs),
+      baseUrl:   String(current.baseUrl)
+    };
+    computeConfigDiff();
+    showToast('success', 'Updated successfully');
+  } catch (e) {
+    showToast('error', 'Update failed');
+    console.error(e);
+  }
 }
 
 // Initialize tabs, charts, initial data load, and auto-refresh on DOM ready
@@ -164,7 +305,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     loadData();
-    setInterval(loadData, 2000);
+    setInterval(loadData, 5000);
+
+    // Config form wiring (if present)
+    const form = document.getElementById('configForm');
+    const btnUpdate = document.getElementById('configUpdateBtn');
+    const inputs = [document.getElementById('cfgMaxEvents'), document.getElementById('cfgMaxLogs'), document.getElementById('cfgBaseUrl')].filter(Boolean);
+    inputs.forEach(inp => {
+      inp.addEventListener('input', computeConfigDiff);
+      inp.addEventListener('change', computeConfigDiff);
+    });
+    form?.addEventListener('submit', submitConfigUpdate);
+    btnUpdate?.addEventListener('click', submitConfigUpdate);
 });
 
 // Theme/pause/export wiring (toggle theme, pause auto-refresh, export events/logs)
@@ -175,7 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function setThemeIcon(){
     const btn = $("#nanoThemeBtn"); if(!btn) return;
     const isLight = document.body.classList.contains('light');
-    btn.textContent = isLight ?  "🌿": "☀️";
+    btn.textContent = isLight ? "🌿" : "☀️";
   }
 
   // Toggle between light and dark theme and persist the choice

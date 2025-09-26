@@ -40,6 +40,7 @@
 <div class="tabs">
     <div class="tab active" data-tab="events">📡 Events</div>
     <div class="tab" data-tab="logs">📝 Logs</div>
+    <div class="tab" data-tab="config">⚙️ Config</div>
 </div>
 
 <div id="events" class="tab-content active">
@@ -47,6 +48,26 @@
 </div>
 <div id="logs" class="tab-content">
     <pre id="logsData" class="log-view"></pre>
+</div>
+<div id="config" class="tab-content">
+  <form id="configForm" class="config-form" novalidate>
+    <div class="field">
+      <label for="cfgMaxEvents">Max Events</label>
+      <input id="cfgMaxEvents" name="maxEvents" type="number" min="0" step="1"/>
+    </div>
+    <div class="field">
+      <label for="cfgMaxLogs">Max Logs</label>
+      <input id="cfgMaxLogs" name="maxLogs" type="number" min="0" step="1"/>
+    </div>
+    <div class="field">
+      <label for="cfgBaseUrl">Base URL</label>
+      <input id="cfgBaseUrl" name="baseUrl" type="text" inputmode="url"/>
+    </div>
+    <div class="actions">
+      <button id="configUpdateBtn" class="btn small" disabled>Update</button>
+    </div>
+  </form>
+  <div id="configToast" class="toast" role="status" aria-live="polite"></div>
 </div>
 
 <script src="charts.js"></script>

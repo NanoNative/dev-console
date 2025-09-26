@@ -1,7 +1,9 @@
 package org.nanonative.ab.devconsole.service;
 
 import berlin.yuna.typemap.model.LinkedTypeMap;
+import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
+import berlin.yuna.typemap.model.TypeMap;
 import berlin.yuna.typemap.model.TypeMapI;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
@@ -26,12 +28,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
-import berlin.yuna.typemap.logic.JsonEncoder;
 import berlin.yuna.typemap.model.ConcurrentTypeSet;
 import org.nanonative.nano.services.logging.LogFormatRegister;
 
+import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
 import static org.nanonative.ab.devconsole.util.ResponseHelper.responseOk;
 import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
+import static org.nanonative.nano.core.model.Context.EVENT_CONFIG_CHANGE;
 import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
 import static org.nanonative.nano.services.http.HttpServer.EVENT_HTTP_REQUEST;
 import static org.nanonative.nano.services.logging.LogService.EVENT_LOGGING;
@@ -55,6 +58,7 @@ public class DevConsoleService extends Service {
     public static final String DEV_EVENTS_URL = "/events";
     public static final String DEV_INFO_URL = "/system-info";
     public static final String DEV_LOGS_URL = "/logs";
+    public static final String DEV_CONFIG_URL = "/config";
 
     // Configurable fields
     public String basePath;
@@ -120,7 +124,6 @@ public class DevConsoleService extends Service {
     public void onEvent(Event<?, ?> event) {
         event.channel(EVENT_HTTP_REQUEST).ifPresent(ev ->
             ev.payloadOpt()
-                .filter(HttpObject::isMethodGet)
                 .ifPresent(
                     request -> handleHttpRequest(ev, request)
                 )
@@ -128,20 +131,59 @@ public class DevConsoleService extends Service {
     }
 
     protected void handleHttpRequest(Event<HttpObject, HttpObject> event, HttpObject request) {
+        HttpObject payload = event.payload();
+        if (payload.isMethodGet()) {
+            handleGet(event, request, payload);
+        } else if (payload.isMethodPost()) {
+            handlePost(event, request, payload);
+        }
+    }
+
+    protected void handleGet(Event<HttpObject, HttpObject> event, HttpObject request, HttpObject payload) {
         if (request.pathMatch(BASE_URL + DEV_INFO_URL)) {
-            event.respond(responseOk(request, JsonEncoder.toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
+            event.respond(responseOk(request, toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) {
             event.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) {
-            event.respond(responseOk(request, JsonEncoder.toJson(logHistory), ContentType.APPLICATION_JSON));
+            event.respond(responseOk(request, toJson(logHistory), ContentType.APPLICATION_JSON));
+        } else if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
+            event.respond(responseOk(payload, getConfig(), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + basePath)) {
-            event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
+            event.respond(responseOk(payload, STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
         } else if (request.pathMatch(BASE_URL + "/{fileName}")) {
             String fileName = request.pathParam("fileName");
             if (STATIC_FILES.containsKey(fileName)) {
-                event.respond(responseOk(event.payload(), STATIC_FILES.get(fileName), getTypeFromFileExt(fileName)));
+                event.respond(responseOk(payload, STATIC_FILES.get(fileName), getTypeFromFileExt(fileName)));
             }
         }
+    }
+
+    protected void handlePost(Event<HttpObject, HttpObject> event, HttpObject request, HttpObject payload) {
+        if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
+            event.respond(responseOk(payload, updateConfig(payload.bodyAsJson()), ContentType.APPLICATION_JSON));
+        }
+    }
+
+    protected String updateConfig(TypeInfo<?> request) {
+        Map<String, Object> configChangeMap = new HashMap<>();
+        if (request.isPresent("maxEvents")) {
+            configChangeMap.put(CONFIG_DEV_CONSOLE_MAX_EVENTS, request.asInt("maxEvents"));
+        }
+        if (request.isPresent("maxLogs")) {
+            configChangeMap.put(CONFIG_DEV_CONSOLE_MAX_LOGS, request.asInt("maxLogs"));
+        }
+        if (request.isPresent("baseUrl")) {
+            configChangeMap.put(CONFIG_DEV_CONSOLE_URL, request.asString("baseUrl"));
+        }
+        context.newEvent(EVENT_CONFIG_CHANGE, () -> configChangeMap).broadcast(true).async(true).send();
+        return toJson(configChangeMap);
+    }
+
+    protected String getConfig() {
+        return new TypeMap(Map.of(
+            "baseUrl", basePath,
+            "maxEvents", maxEvents,
+            "maxLogs", maxLogs)).toJson();
     }
 
 

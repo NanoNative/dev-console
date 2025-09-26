@@ -38,12 +38,10 @@ h2 {
     border: 1px solid rgba(255,255,255,0.2);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-
 .chart-container:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 40px rgba(0,0,0,0.15);
 }
-
 .chart-container canvas {
     width: 100%;
     height: auto;
@@ -58,7 +56,6 @@ h2 {
     border-radius: 12px 12px 0 0;
     overflow: hidden;
 }
-
 .tab {
     padding: 1rem 1.5rem;
     cursor: pointer;
@@ -69,17 +66,12 @@ h2 {
     font-weight: 500;
     backdrop-filter: blur(10px);
 }
-
-.tab:hover {
-    background: rgba(255,255,255,0.2);
-}
-
+.tab:hover { background: rgba(255,255,255,0.2); }
 .tab.active {
     background: rgba(255,255,255,0.9);
     color: #333;
     font-weight: bold;
 }
-
 .tab-content {
     display: none;
     background: rgba(255,255,255,0.95);
@@ -89,11 +81,9 @@ h2 {
     box-shadow: 0 8px 32px rgba(0,0,0,0.1);
     backdrop-filter: blur(10px);
 }
+.tab-content.active { display: block; }
 
-.tab-content.active {
-    display: block;
-}
-
+/* ====== Pre blocks ====== */
 pre {
     margin: 0;
     overflow-x: auto;
@@ -106,6 +96,7 @@ pre {
     border: 1px solid #e9ecef;
 }
 
+/* ====== System Info container ====== */
 #system {
     background: rgba(255,255,255,0.95);
     border: none;
@@ -116,222 +107,94 @@ pre {
     backdrop-filter: blur(10px);
 }
 
+/* System Info key-value grid */
 #system .kv {
-  display: grid;
-  grid-template-columns: max-content 1fr max-content 1fr;
-  column-gap: 16px;
-  row-gap: 6px;
+    display: grid;
+    grid-template-columns: max-content 1fr max-content 1fr;
+    column-gap: 16px;
+    row-gap: 6px;
 }
-@media (max-width: 900px){ #system .kv { grid-template-columns: max-content 1fr; } }
+@media (max-width: 900px) {
+    #system .kv { grid-template-columns: max-content 1fr; }
+}
 #system .k { color: #4a5166; white-space: nowrap; }
 #system .v { color: #1e2437; word-break: break-word; }
-body:not(.light) #system .k { color: #b6bed3; }
-body:not(.light) #system .v { color: #e6e6e6; }
 #system .arr { display: inline-flex; flex-wrap: wrap; gap: 6px; }
-#system .tag { padding: 2px 6px; border-radius: 999px; border: 1px solid rgba(0,0,0,0.08); background: rgba(0,0,0,0.04); font-size: 0.75rem; color: #1e2437; }
-body:not(.light) #system .tag { background: #111; border-color: #333; color: #d1d7ff; }
+#system .tag {
+    padding: 2px 6px;
+    border-radius: 999px;
+    border: 1px solid rgba(0,0,0,0.08);
+    background: rgba(0,0,0,0.04);
+    font-size: 0.75rem;
+    color: #1e2437;
+}
 
 /* Borders for each JSON record in events/logs */
 .log-view .nano-list .nano-row {
-  border-bottom: 1px solid rgba(0,0,0,0.22);
-  padding: 2px 6px;
+    border-bottom: 1px solid rgba(0,0,0,0.22);
+    padding: 2px 6px;
 }
 .log-view .nano-list .nano-row:last-child { border-bottom: none; }
-body:not(.light) .log-view .nano-list .nano-row { border-bottom-color: rgba(255,255,255,0.15); }
 
+/* ====== Toolbar ====== */
 .toolbar {
-  position: sticky; top: 0; z-index: 1000;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0.75rem 1rem; margin: 0 0 1rem 0;
-  background: linear-gradient(135deg, rgba(102,126,234,0.25) 0%, rgba(118,75,162,0.25) 100%);
-  backdrop-filter: blur(10px) saturate(120%);
-  border-bottom: 1px solid rgba(255,255,255,0.22);
-  box-shadow: 0 6px 24px rgba(0,0,0,0.25);
+    position: sticky; top: 0; z-index: 1000;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.75rem 1rem; margin: 0 0 1rem 0;
+    background: linear-gradient(135deg, rgba(102,126,234,0.25) 0%, rgba(118,75,162,0.25) 100%);
+    backdrop-filter: blur(10px) saturate(120%);
+    border-bottom: 1px solid rgba(255,255,255,0.22);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.25);
 }
-.toolbar .left { color: #fff; font-weight: 800; letter-spacing: .2px; text-shadow: 0 1px 2px rgba(0,0,0,0.35); }
+.toolbar .left {
+    color: #fff; font-weight: 800; letter-spacing: .2px; text-shadow: 0 1px 2px rgba(0,0,0,0.35);
+}
 .toolbar .right { display: flex; gap: .5rem; }
 .btn.small {
-  padding: .5rem .75rem; border-radius: 10px;
-  border: 1px solid rgba(255,255,255,0.35);
-  background: rgba(255,255,255,0.14);
-  color: #f7f7ff; cursor: pointer;
-  transition: transform .12s ease, background .15s ease, box-shadow .15s ease, border-color .15s ease;
-  box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    padding: .5rem .75rem; border-radius: 10px;
+    border: 1px solid rgba(255,255,255,0.35);
+    background: rgba(255,255,255,0.14);
+    color: #f7f7ff; cursor: pointer;
+    transition: transform .12s ease, background .15s ease, box-shadow .15s ease, border-color .15s ease;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
 }
 .btn.small:hover { transform: translateY(-1px); background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.45); }
 .btn.small:active { transform: translateY(0); box-shadow: 0 4px 12px rgba(0,0,0,0.25) inset; }
 
-body.light .btn.small { border-color: #d0d4e0; background: #ffffff; color: #1d2333; box-shadow: 0 4px 12px rgba(31,35,53,0.12); }
-
-#system .k { color: #3a4256; }
-#system .v { color: #121722; }
-body.light #system .k { color: #2c3345; }
-body.light #system .v { color: #0f1420; }
-
-/* === Eco Dark Mode (true black) === */
+/* ====== Eco Dark Mode (true black) ====== */
 body:not(.light) {
-  background: #000 !important;
-  color: #e6e6e6;
+    background: #000 !important;
+    color: #e6e6e6;
 }
-
-/* Headings readable on black */
-body:not(.light) h1,
-body:not(.light) h2 {
-  color: #f5f5f5;
-  text-shadow: none;
+body:not(.light) h1, body:not(.light) h2 {
+    color: #f5f5f5; text-shadow: none;
 }
-
-/* Charts in dark */
 body:not(.light) .chart-container {
-  background: #111;
-  border: 1px solid #222;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.6);
+    background: #111; border: 1px solid #222; box-shadow: 0 8px 20px rgba(0,0,0,0.6);
 }
-
-/* Tabs in dark: dark shade with white text */
-body:not(.light) .tabs {
-  background: #0f0f0f;
-  border-bottom: 1px solid #222;
-}
-body:not(.light) .tab {
-  background: #161616;
-  color: #fff;
-}
+body:not(.light) .tabs { background: #0f0f0f; border-bottom: 1px solid #222; }
+body:not(.light) .tab { background: #161616; color: #fff; }
 body:not(.light) .tab:hover { background: #1f1f1f; }
-body:not(.light) .tab.active {
-  background: #222;
-  color: #fff;
-  font-weight: 600;
-}
+body:not(.light) .tab.active { background: #222; color: #fff; font-weight: 600; }
+body:not(.light) .tab-content { background: #0f0f0f; border: 1px solid #222; color: #e6e6e6; }
+body:not(.light) pre { background: #0a0a0a; border: 1px solid #1a1a1a; color: #e6e6e6; }
+body:not(.light) #system { background: #0f0f0f; border: 1px solid #1a1a1a; }
+body:not(.light) .toolbar { background: #0b0b0b; border-bottom-color: #1a1a1a; box-shadow: none; }
+body:not(.light) .btn.small { background: #141414; border: 1px solid #2a2a2a; color: #e6e6e6; }
+body:not(.light) .log-view .nano-list .nano-row { border-bottom-color: rgba(255,255,255,0.15); }
+body:not(.light) #system .k { color: #b6bed3; }
+body:not(.light) #system .v { color: #e6e6e6; }
+body:not(.light) #system .tag { background: #111; border-color: #333; color: #d1d7ff; }
 
-/* Tab content in dark */
-body:not(.light) .tab-content {
-  background: #0f0f0f;
-  border: 1px solid #222;
-  color: #e6e6e6;
-}
-
-/* Pre blocks & System Info in dark */
-body:not(.light) pre {
-  background: #0a0a0a;
-  border: 1px solid #1a1a1a;
-  color: #e6e6e6;
-}
-body:not(.light) #system {
-  background: #0f0f0f;
-  border: 1px solid #1a1a1a;
-}
-
-/* Toolbar in dark */
-body:not(.light) .toolbar {
-  background: #0b0b0b;
-  border-bottom-color: #1a1a1a;
-  box-shadow: none;
-}
-body:not(.light) .btn.small {
-  background: #141414;
-  border: 1px solid #2a2a2a;
-  color: #e6e6e6;
-}
-
-/* Keep borders for JSON rows visible in dark (already added earlier) */
-body:not(.light) .log-view .nano-list .nano-row {
-  border-bottom-color: rgba(255,255,255,0.15);
-}
-
-/* Light keeps existing colorful cards/tabs from base CSS */
-
-/* light grey */
-  color: #000;                    /* default text black */
-}
-
-/* Headings readable on light */
-body.light h1,
-body.light h2 {
-  color: #111;
-  text-shadow: none;
-}
-
-/* Keep toolbar text white in light mode */
-body.light .toolbar .left { color: #fff; }
-
-/* Tabs container on light */
-body.light .tabs {
-  background: #ffffff;
-  border-bottom: 1px solid #e5e7ef;
-}
-
-/* Base tab style on light (overrides previous) */
-body.light .tab {
-  color: #111;
-  border: 0;
-}
-
-/* Specific tab colors */
-
-/* If a System tab exists in future */
-
-/* System Info text darker in light */
-body.light #system .k { color: #111; }
-body.light #system .v { color: #000; }
-
-/* Tab content stays clean white on light */
-body.light .tab-content {
-  background: #ffffff;
-  border: 1px solid #e5e7ef;
-  color: #111;
-}
-
-/* Darker title bar than page background */
-
-body.light .toolbar .left { color: #fff; } /* keep title white */
-
-/* Colored content backgrounds (not buttons) */
-body.light #logs.tab-content,
-body.light #logs {
-  background: #fff8d6 !important; /* light yellow */
-  border: 1px solid #eadf9c;
-  color: #111;
-}
-body.light #events.tab-content,
-body.light #events {
-  background: #e8f7ee !important; /* light green */
-  border: 1px solid #cfe9db;
-  color: #111;
-}
-
-/* Make inner <pre> transparent so parent tab color shows */
-body.light #logs .log-view,
-body.light #events .log-view {
-  background: transparent !important;
-  border-color: transparent !important;
-  color: #111 !important;
-}
-
-/* System Info data area uses sky-blue in light mode */
-body.light #system {
-  background: #e7f2ff !important; /* sky blue */
-  border: 1px solid #cfe3ff !important;
-  color: #0b2a4a;
-}
-
-/* === Light mode: bluish purple title bar === */
-body.light .toolbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: #fff;
-  border-bottom-color: #cfd2ff;
-}
-body.light .toolbar .left { color: #fff; }
-
+/* ====== Light Mode (consolidated) ====== */
 body.light {
-  background: linear-gradient(135deg, #5761ee 0%, #7a37a3 100%) !important;
-  color: #000;
+    background: linear-gradient(135deg, #5761ee 0%, #7a37a3 100%) !important;
+    color: #000;
 }
 body.light h1, body.light h2 {
   color: #111;
   text-shadow: none;
 }
-/* Bluish-purple title bar */
 body.light .toolbar {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
   color: #fff;
@@ -344,40 +207,66 @@ body.light .btn.small { border-color: #d0d4e0; background: #ffffff; color: #1d23
 body.light .tabs { background: #ffffff; border-bottom: 1px solid #e5e7ef; }
 body.light .tab { color: #111; border: 0; }
 body.light .tab.active { background: rgba(255,255,255,0.9); color: #111; }
-/* Colored content backgrounds (data areas, not buttons) */
-body.light #logs.tab-content, body.light #logs {
-  background: #fff8d6 !important; border: 1px solid #eadf9c; color: #111;
-}
-body.light #events.tab-content, body.light #events {
-  background: #e8f7ee !important; border: 1px solid #cfe9db; color: #111;
-}
-/* System Info panel sky-blue */
-body.light #system {
-  background: #e7f2ff !important; border: 1px solid #cfe3ff !important; color: #0b2a4a;
-}
+/* Colored content backgrounds (data areas) */
+body.light #logs.tab-content, body.light #logs { background: #fff8d6 !important; border: 1px solid #eadf9c; color: #111; }
+body.light #events.tab-content, body.light #events { background: #e8f7ee !important; border: 1px solid #cfe9db; color: #111; }
+body.light #system { background: #e7f2ff !important; border: 1px solid #cfe3ff !important; color: #0b2a4a; }
 body.light #system .k { color: #111; }
 body.light #system .v { color: #000; }
 /* Make inner <pre> transparent so parent color shows */
 body.light #logs .log-view, body.light #events .log-view {
-  background: transparent !important; border-color: transparent !important; color: #111 !important;
+    background: transparent !important; border-color: transparent !important; color: #111 !important;
 }
+/* Light mode: match tab buttons to their content colors */
+body.light .tab[data-tab="logs"] { background: #fff8d6; color: #4a3b00; }
+body.light .tab.active[data-tab="logs"] { background: #fff1a8; color: #3a2d00; }
+body.light .tab[data-tab="events"] { background: #e8f7ee; color: #0b3d20; }
+body.light .tab.active[data-tab="events"] { background: #d6efdf; color: #08351a; }
 
+/* Config form layout */
+.config-form { display: grid; gap: 12px; max-width: 560px; }
+.config-form .field { display: grid; gap: 6px; }
+.config-form label { font-weight: 600; }
+.config-form input[type="number"],
+.config-form input[type="text"] {
+    padding: 8px 10px; border-radius: 8px; border: 1px solid #d6d9e6; outline: none;
+    background: #fff; color: #111; font-size: 14px;
+}
+.config-form input:focus { border-color: #7a37a3; box-shadow: 0 0 0 3px rgba(122,55,163,0.15); }
+.config-form .actions { margin-top: 8px; }
+.btn[disabled], .btn:disabled { opacity: .55; cursor: not-allowed; }
 
-/* === Light mode: match tab buttons to their content colors === */
-body.light .tab[data-tab="logs"] {
-  background: #fff8d6;
-  color: #4a3b00;
+/* Toast popup (auto-hide) */
+.toast {
+    position: fixed; right: 16px; bottom: 16px;
+    padding: 10px 14px; border-radius: 10px; font-weight: 600;
+    color: #0b2a0b; background: #d9f7da; border: 1px solid #a9e7ad;
+    box-shadow: 0 10px 32px rgba(0,0,0,0.18);
+    opacity: 0; pointer-events: none; transform: translateY(10px);
+    transition: opacity .15s ease, transform .15s ease;
 }
-body.light .tab.active[data-tab="logs"] {
-  background: #fff1a8;
-  color: #3a2d00;
-}
+.toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
+.toast.error { background: #ffe3e3; color: #5a0b0b; border-color: #ffb3b3; }
 
-body.light .tab[data-tab="events"] {
-  background: #e8f7ee;
-  color: #0b3d20;
+/* Dark-mode input/toast tweaks */
+body:not(.light) #config .config-form input { background: #0f0f0f; color: #e6e6e6; border-color: #2a2a2a; }
+body:not(.light) .toast { background: #112611; color: #c8f3cc; border-color: #204b21; }
+body:not(.light) .toast.error { background: #2a1111; color: #ffd6d6; border-color: #4b2020; }
+
+/* Config validation errors */
+.config-form .field.error input {
+  border-color: #e53935 !important;
+  box-shadow: 0 0 0 3px rgba(229,57,53,.15) !important;
 }
-body.light .tab.active[data-tab="events"] {
-  background: #d6efdf;
-  color: #08351a;
+.config-form .error-msg {
+  color: #e53935;
+  font-size: 12px;
+  margin-top: 4px;
+}
+body:not(.light) .config-form .field.error input {
+  border-color: #ff6b6b !important;
+  box-shadow: 0 0 0 3px rgba(255,107,107,.15) !important;
+}
+body:not(.light) .config-form .error-msg {
+  color: #ff9aa2;
 }

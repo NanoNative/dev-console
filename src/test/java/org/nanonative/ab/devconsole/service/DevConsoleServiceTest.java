@@ -71,7 +71,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
         assertThat(DevConsoleService.STATIC_FILES.size()).isEqualTo(4);
-        assertThat(result.bodyAsString()).contains("\uD83D\uDE80 Nano Dev Console");
+        assertThat(result.bodyAsString()).contains("\uD83D\uDE80 Nano Developer Console");
     }
 
     @Test
@@ -87,6 +87,6 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
         assertThat(DevConsoleService.STATIC_FILES.size()).isEqualTo(4);
-        assertThat(result.bodyAsString()).contains("\uD83D\uDE80 Nano Dev Console");
+        assertThat(result.bodyAsString()).contains("\uD83D\uDE80 Nano Developer Console");
     }
 }
