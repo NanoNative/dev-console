@@ -6,7 +6,17 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<h1>🚀 Nano Dev Console</h1>
+<!-- Toolbar -->
+<div id="nanoToolbar" class="toolbar">
+  <div class="left">🚀 Nano</div>
+  <div class="right">
+    <button id="nanoThemeBtn" class="btn small" title="Toggle theme">🌿</button>
+    <button id="nanoPauseBtn" class="btn small" title="Pause/Resume">⏸ Pause</button>
+    <button id="nanoExportBtn" class="btn small" title="Export events & logs">⬇️ Export</button>
+  </div>
+</div>
+
+<h1>🚀 Nano Developer Console</h1>
 
 <h2>📊 Real-time Metrics</h2>
 <div class="charts-grid">
@@ -33,10 +43,10 @@
 </div>
 
 <div id="events" class="tab-content active">
-    <pre id="eventsData"></pre>
+    <pre id="eventsData" class="log-view"></pre>
 </div>
 <div id="logs" class="tab-content">
-    <pre id="logsData"></pre>
+    <pre id="logsData" class="log-view"></pre>
 </div>
 
 <script src="charts.js"></script>
