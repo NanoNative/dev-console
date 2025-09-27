@@ -5,6 +5,14 @@ import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMap;
 import berlin.yuna.typemap.model.TypeMapI;
+import org.nanonative.ab.devconsole.util.DevConfig;
+import org.nanonative.ab.devconsole.util.DevEvents;
+import org.nanonative.ab.devconsole.util.DevHtml;
+import org.nanonative.ab.devconsole.util.DevInfo;
+import org.nanonative.ab.devconsole.util.DevLogs;
+import org.nanonative.ab.devconsole.util.DevUiFile;
+import org.nanonative.ab.devconsole.util.NoMatch;
+import org.nanonative.ab.devconsole.util.RoutesMatch;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
@@ -86,22 +94,13 @@ public class DevConsoleService extends Service {
         context.info(() -> "[{}] started at {} ", name(), BASE_URL + basePath);
     }
 
+    @SuppressWarnings("ConstantConditions")
     protected void checkForNewChannelsAndSubscribe() {
         NanoBase.EVENT_CHANNELS.values().forEach(channel -> {
             if (channel != EVENT_APP_HEARTBEAT && subscribedChannels.add(channel)) {
                 context.subscribeEvent(channel, this::recordEvent);
             }
         });
-    }
-
-    @Override
-    public void stop() {
-        context.info(() -> "[{}] stopped.", name());
-    }
-
-    @Override
-    public Object onFailure(Event event) {
-        return null;
     }
 
     protected void recordEvent(Event<?, ?> event) {
@@ -121,39 +120,75 @@ public class DevConsoleService extends Service {
     }
 
     @Override
+    public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
+        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
+        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
+        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
+
+        if (maxEvents < eventHistory.size()) {
+            removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
+        }
+        if (maxLogs < logHistory.size()) {
+            removeLastNElements(logHistory, logHistory.size() - maxLogs);
+        }
+    }
+
+    @Override
+    public Object onFailure(Event event) {
+        return null;
+    }
+
+    @Override
+    public void stop() {
+        context.info(() -> "[{}] stopped.", name());
+    }
+
+    @SuppressWarnings("unchecked")
+    @Override
     public void onEvent(Event<?, ?> event) {
-        event.channel(EVENT_HTTP_REQUEST).flatMap(Event::payloadOpt).ifPresent(request -> handleHttpRequest((Event<HttpObject, HttpObject>) event, request));
+        event.channel(EVENT_HTTP_REQUEST).flatMap(Event::payloadOpt).ifPresent(request -> handleHttpRequest((Event<HttpObject, HttpObject>) event));
     }
 
-    protected void handleHttpRequest(Event<HttpObject, HttpObject> event, HttpObject request) {
-        switch (request.methodType()) {
-            case GET -> handleGet(event, request);
-            case PATCH -> handlePatch(event, request);
+    protected void handleHttpRequest(final Event<HttpObject, HttpObject> event) {
+        switch (event.payload().methodType()) {
+            case GET -> handleGet(event);
+            case PATCH -> handlePatch(event);
         }
     }
 
-    protected void handleGet(Event<HttpObject, HttpObject> event, HttpObject request) {
-        if (request.pathMatch(BASE_URL + DEV_INFO_URL)) {
-            event.respond(responseOk(request, toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
-        } else if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) {
-            event.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON));
-        } else if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) {
-            event.respond(responseOk(request, toJson(logHistory), ContentType.APPLICATION_JSON));
-        } else if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            event.respond(responseOk(request, getConfig(), ContentType.APPLICATION_JSON));
-        } else if (request.pathMatch(BASE_URL + basePath)) {
-            event.respond(responseOk(request, STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
-        } else if (request.pathMatch(BASE_URL + "/{fileName}")) {
-            String fileName = request.pathParam("fileName");
-            if (STATIC_FILES.containsKey(fileName)) {
-                event.respond(responseOk(request, STATIC_FILES.get(fileName), getTypeFromFileExt(fileName)));
+    protected void handleGet(Event<HttpObject, HttpObject> event) {
+        switch (match(event.payload())) {
+            case DevInfo __ ->
+                event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
+            case DevEvents __ ->
+                event.respond(responseOk(event.payload(), getEventList(), ContentType.APPLICATION_JSON));
+            case DevLogs __ ->
+                event.respond(responseOk(event.payload(), toJson(logHistory), ContentType.APPLICATION_JSON));
+            case DevConfig __ -> event.respond(responseOk(event.payload(), getConfig(), ContentType.APPLICATION_JSON));
+            case DevHtml __ ->
+                event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
+            case DevUiFile fr -> {
+                if (STATIC_FILES.containsKey(fr.fileName())) {
+                    event.respond(responseOk(event.payload(), STATIC_FILES.get(fr.fileName()), getTypeFromFileExt(fr.fileName())));
+                }
             }
+            case NoMatch __ -> {}
         }
     }
 
-    protected void handlePatch(Event<HttpObject, HttpObject> event, HttpObject request) {
-        if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            event.respond(responseOk(request, updateConfig(request.bodyAsJson()), request.contentType()));
+    protected RoutesMatch match(HttpObject request) {
+        if (request.pathMatch(BASE_URL + DEV_INFO_URL)) return new DevInfo();
+        if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) return new DevEvents();
+        if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
+        if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
+        if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
+        if (request.pathMatch(BASE_URL + "/{fileName}")) return new DevUiFile(request.pathParam("fileName"));
+        return new NoMatch();
+    }
+
+    protected void handlePatch(Event<HttpObject, HttpObject> event) {
+        if (event.payload().pathMatch(BASE_URL + DEV_CONFIG_URL)) {
+            event.respond(responseOk(event.payload(), updateConfig(event.payload().bodyAsJson()), event.payload().contentType()));
         }
     }
 
@@ -177,21 +212,6 @@ public class DevConsoleService extends Service {
             "baseUrl", basePath,
             "maxEvents", maxEvents,
             "maxLogs", maxLogs)).toJson();
-    }
-
-
-    @Override
-    public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
-        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
-        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
-        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
-
-        if (maxEvents < eventHistory.size()) {
-            removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
-        }
-        if (maxLogs < logHistory.size()) {
-            removeLastNElements(logHistory, logHistory.size() - maxLogs);
-        }
     }
 
     public String getEventList() {
@@ -256,8 +276,8 @@ public class DevConsoleService extends Service {
         };
     }
 
-    public static void removeLastNElements(Deque<?> deque, int n) {
-        for (int i = 0; i < n; i++) {
+    public static void removeLastNElements(Deque<?> deque, final int N) {
+        for (int i = 0; i < N; i++) {
             deque.removeLast();
         }
     }
