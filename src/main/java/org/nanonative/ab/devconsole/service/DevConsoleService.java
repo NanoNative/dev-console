@@ -61,9 +61,9 @@ public class DevConsoleService extends Service {
     public static final String DEV_CONFIG_URL = "/config";
 
     // Configurable fields
-    public String basePath;
-    public Integer maxEvents;
-    public Integer maxLogs;
+    protected String basePath;
+    protected Integer maxEvents;
+    protected Integer maxLogs;
 
     // Data structures
     public static final Map<String, String> STATIC_FILES = new HashMap<>();
@@ -107,13 +107,13 @@ public class DevConsoleService extends Service {
     protected void recordEvent(Event<?, ?> event) {
         if (!event.channel().equals(EVENT_LOGGING)) {
             if (eventHistory.size() >= maxEvents) {
-                eventHistory.removeLast();
+                removeLastNElements(eventHistory, eventHistory.size() - maxEvents + 1);
             }
             event.put("createdTs", Instant.now());
             eventHistory.addFirst(event);
         } else {
             if (logHistory.size() >= maxLogs) {
-                logHistory.removeLast();
+                removeLastNElements(logHistory, logHistory.size() - maxLogs + 1);
             }
             logHistory.addFirst(logFormatter.format((LogRecord) event.payload()));
         }
@@ -126,10 +126,9 @@ public class DevConsoleService extends Service {
     }
 
     protected void handleHttpRequest(Event<HttpObject, HttpObject> event, HttpObject request) {
-        if (request.isMethodGet()) {
-            handleGet(event, request);
-        } else if (request.isMethodPatch()) {
-            handlePatch(event, request);
+        switch (request.methodType()) {
+            case GET -> handleGet(event, request);
+            case PATCH -> handlePatch(event, request);
         }
     }
 
@@ -186,6 +185,13 @@ public class DevConsoleService extends Service {
         this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
         this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
         this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
+
+        if (maxEvents < eventHistory.size()) {
+            removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
+        }
+        if (maxLogs < logHistory.size()) {
+            removeLastNElements(logHistory, logHistory.size() - maxLogs);
+        }
     }
 
     public String getEventList() {
@@ -248,5 +254,11 @@ public class DevConsoleService extends Service {
             case "js" -> ContentType.APPLICATION_JAVASCRIPT;
             default -> ContentType.TEXT_PLAIN;
         };
+    }
+
+    public static void removeLastNElements(Deque<?> deque, int n) {
+        for (int i = 0; i < n; i++) {
+            deque.removeLast();
+        }
     }
 }
