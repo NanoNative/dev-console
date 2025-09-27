@@ -5,14 +5,6 @@ import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMap;
 import berlin.yuna.typemap.model.TypeMapI;
-import org.nanonative.ab.devconsole.util.DevConfig;
-import org.nanonative.ab.devconsole.util.DevEvents;
-import org.nanonative.ab.devconsole.util.DevHtml;
-import org.nanonative.ab.devconsole.util.DevInfo;
-import org.nanonative.ab.devconsole.util.DevLogs;
-import org.nanonative.ab.devconsole.util.DevUiFile;
-import org.nanonative.ab.devconsole.util.NoMatch;
-import org.nanonative.ab.devconsole.util.RoutesMatch;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
@@ -157,6 +149,26 @@ public class DevConsoleService extends Service {
     }
 
     protected void handleGet(Event<HttpObject, HttpObject> event) {
+        if (event.payload().pathMatch(BASE_URL + DEV_INFO_URL)) {
+            event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
+        } else if (event.payload().pathMatch(BASE_URL + DEV_EVENTS_URL)) {
+            event.respond(responseOk(event.payload(), getEventList(), ContentType.APPLICATION_JSON));
+        } else if (event.payload().pathMatch(BASE_URL + DEV_LOGS_URL)) {
+            event.respond(responseOk(event.payload(), toJson(logHistory), ContentType.APPLICATION_JSON));
+        } else if (event.payload().pathMatch(BASE_URL + DEV_CONFIG_URL)) {
+            event.respond(responseOk(event.payload(), getConfig(), ContentType.APPLICATION_JSON));
+        } else if (event.payload().pathMatch(BASE_URL + basePath)) {
+            event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
+        } else if (event.payload().pathMatch(BASE_URL + "/{fileName}")) {
+            String fileName = event.payload().pathParam("fileName");
+            if (STATIC_FILES.containsKey(fileName)) {
+                event.respond(responseOk(event.payload(), STATIC_FILES.get(fileName), getTypeFromFileExt(fileName)));
+            }
+        }
+    }
+
+    /* Experimental: Can replace the above handleGet(Event) method. However, this is less performant than if/else.
+    protected void handleGet1(Event<HttpObject, HttpObject> event) {
         switch (match(event.payload())) {
             case DevInfo __ ->
                 event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
@@ -184,7 +196,7 @@ public class DevConsoleService extends Service {
         if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
         if (request.pathMatch(BASE_URL + "/{fileName}")) return new DevUiFile(request.pathParam("fileName"));
         return new NoMatch();
-    }
+    }*/
 
     protected void handlePatch(Event<HttpObject, HttpObject> event) {
         if (event.payload().pathMatch(BASE_URL + DEV_CONFIG_URL)) {
