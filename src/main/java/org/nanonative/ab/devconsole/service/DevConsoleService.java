@@ -128,8 +128,8 @@ public class DevConsoleService extends Service {
     protected void handleHttpRequest(Event<HttpObject, HttpObject> event, HttpObject request) {
         if (request.isMethodGet()) {
             handleGet(event, request);
-        } else if (request.isMethodPost()) {
-            handlePost(event, request);
+        } else if (request.isMethodPatch()) {
+            handlePatch(event, request);
         }
     }
 
@@ -152,9 +152,9 @@ public class DevConsoleService extends Service {
         }
     }
 
-    protected void  handlePost(Event<HttpObject, HttpObject> event, HttpObject request) {
+    protected void handlePatch(Event<HttpObject, HttpObject> event, HttpObject request) {
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            event.respond(responseOk(request, updateConfig(request.bodyAsJson()), ContentType.APPLICATION_JSON));
+            event.respond(responseOk(request, updateConfig(request.bodyAsJson()), request.contentType()));
         }
     }
 

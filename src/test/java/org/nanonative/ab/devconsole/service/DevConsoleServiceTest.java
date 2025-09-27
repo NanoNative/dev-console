@@ -85,7 +85,7 @@ class DevConsoleServiceTest {
         final Integer maxLogs = devConsoleService.maxLogs;
 
         final HttpObject result = new HttpObject()
-            .methodType(HttpMethod.POST)
+            .methodType(HttpMethod.PATCH)
             .body(Map.of("baseUrl", newBaseUrl, "maxLogs", newMaxLogs))
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_CONFIG_URL)
             .send(nano.context(DevConsoleServiceTest.class));

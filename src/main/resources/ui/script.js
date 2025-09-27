@@ -230,8 +230,8 @@ async function submitConfigUpdate(e){
 
   try {
     const resp = await fetch('/dev-console/config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/merge-patch+json' },
       body: JSON.stringify(changed)
     });
 
