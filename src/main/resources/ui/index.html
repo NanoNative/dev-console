@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8"/>
     <title>Dev Console</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <!-- Toolbar -->
 <div id="nanoToolbar" class="toolbar">
-  <div class="left">🚀 Nano</div>
-  <div class="right">
-    <button id="nanoThemeBtn" class="btn small" title="Toggle theme">🌿</button>
-    <button id="nanoPauseBtn" class="btn small" title="Pause/Resume">⏸ Pause</button>
-    <button id="nanoExportBtn" class="btn small" title="Export events & logs">⬇️ Export</button>
-  </div>
+    <div class="left">🚀 Nano</div>
+    <div class="right">
+        <button id="nanoThemeBtn" class="btn small" title="Toggle theme">🌿</button>
+        <button id="nanoPauseBtn" class="btn small" title="Pause/Resume">⏸ Pause</button>
+        <button id="nanoExportBtn" class="btn small" title="Export events & logs">⬇️ Export</button>
+    </div>
 </div>
 
 <h1>🚀 Nano Developer Console</h1>
@@ -24,13 +24,16 @@
         <canvas id="memoryChart" width="300" height="200"></canvas>
     </div>
     <div class="chart-container">
+        <canvas id="heapChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="cpuChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
         <canvas id="threadsChart" width="300" height="200"></canvas>
     </div>
     <div class="chart-container">
         <canvas id="eventsChart" width="300" height="200"></canvas>
-    </div>
-    <div class="chart-container">
-        <canvas id="heapChart" width="300" height="200"></canvas>
     </div>
 </div>
 
@@ -50,24 +53,24 @@
     <pre id="logsData" class="log-view"></pre>
 </div>
 <div id="config" class="tab-content">
-  <form id="configForm" class="config-form" novalidate>
-    <div class="field">
-      <label for="cfgMaxEvents">Max Events to be retained</label>
-      <input id="cfgMaxEvents" name="maxEvents" type="number" min="0" step="1"/>
-    </div>
-    <div class="field">
-      <label for="cfgMaxLogs">Max Logs to be retained</label>
-      <input id="cfgMaxLogs" name="maxLogs" type="number" min="0" step="1"/>
-    </div>
-    <div class="field">
-      <label for="cfgBaseUrl">Base URL</label>
-      <input id="cfgBaseUrl" name="baseUrl" type="text" inputmode="url"/>
-    </div>
-    <div class="actions">
-      <button id="configUpdateBtn" class="btn small" disabled>Update</button>
-    </div>
-  </form>
-  <div id="configToast" class="toast" role="status" aria-live="polite"></div>
+    <form id="configForm" class="config-form" novalidate>
+        <div class="field">
+            <label for="cfgMaxEvents">Max Events to be retained</label>
+            <input id="cfgMaxEvents" name="maxEvents" type="number" min="0" step="1"/>
+        </div>
+        <div class="field">
+            <label for="cfgMaxLogs">Max Logs to be retained</label>
+            <input id="cfgMaxLogs" name="maxLogs" type="number" min="0" step="1"/>
+        </div>
+        <div class="field">
+            <label for="cfgBaseUrl">Base URL</label>
+            <input id="cfgBaseUrl" name="baseUrl" type="text" inputmode="url"/>
+        </div>
+        <div class="actions">
+            <button id="configUpdateBtn" class="btn small" disabled>Update</button>
+        </div>
+    </form>
+    <div id="configToast" class="toast" role="status" aria-live="polite"></div>
 </div>
 
 <script src="charts.js"></script>

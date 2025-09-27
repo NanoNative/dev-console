@@ -48,3 +48,5 @@ __pycache__
 
 lib/
 node_modules
+runs/
+scripts/

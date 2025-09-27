@@ -20,6 +20,7 @@ import static org.nanonative.ab.devconsole.service.DevConsoleService.DEV_EVENTS_
 import static org.nanonative.ab.devconsole.service.DevConsoleService.DEV_INFO_URL;
 import static org.nanonative.ab.devconsole.service.DevConsoleService.DEV_LOGS_URL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.nanonative.ab.devconsole.util.UiHelper.STATIC_FILES;
 
 class DevConsoleServiceTest {
 
@@ -78,7 +79,7 @@ class DevConsoleServiceTest {
     @Test
     void updateConfigTest() {
         final String newBaseUrl = "/tests";
-        final Integer newMaxLogs = 101;
+        final int newMaxLogs = 101;
         final DevConsoleService devConsoleService = new DevConsoleService();
         final Nano nano = new Nano(new HttpServer(), devConsoleService, new HttpClient());
         final String baseUrl = devConsoleService.basePath;
@@ -109,7 +110,7 @@ class DevConsoleServiceTest {
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
-        assertThat(DevConsoleService.STATIC_FILES.size()).isEqualTo(4);
+        assertThat(STATIC_FILES.size()).isEqualTo(4);
         assertThat(result.bodyAsString()).contains("<!DOCTYPE html>");
     }
 
@@ -125,7 +126,7 @@ class DevConsoleServiceTest {
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
-        assertThat(DevConsoleService.STATIC_FILES.size()).isEqualTo(4);
+        assertThat(STATIC_FILES.size()).isEqualTo(4);
         assertThat(result.bodyAsString()).contains("<!DOCTYPE html>");
     }
 }

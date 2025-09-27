@@ -3,8 +3,8 @@ package org.nanonative.ab.devconsole.service;
 import berlin.yuna.typemap.model.LinkedTypeMap;
 import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
-import berlin.yuna.typemap.model.TypeMap;
 import berlin.yuna.typemap.model.TypeMapI;
+import com.sun.management.OperatingSystemMXBean;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
@@ -13,16 +13,16 @@ import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.management.ManagementFactory;
-import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Formatter;
@@ -32,7 +32,10 @@ import berlin.yuna.typemap.model.ConcurrentTypeSet;
 import org.nanonative.nano.services.logging.LogFormatRegister;
 
 import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
+import static org.nanonative.ab.devconsole.util.ResponseHelper.getTypeFromFileExt;
 import static org.nanonative.ab.devconsole.util.ResponseHelper.responseOk;
+import static org.nanonative.ab.devconsole.util.UiHelper.STATIC_FILES;
+import static org.nanonative.ab.devconsole.util.UiHelper.loadStaticFiles;
 import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
 import static org.nanonative.nano.core.model.Context.EVENT_CONFIG_CHANGE;
 import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
@@ -46,10 +49,6 @@ public class DevConsoleService extends Service {
     public static final String CONFIG_DEV_CONSOLE_MAX_LOGS = registerConfig("dev_console_max_logs", "Max number of logs to retain in memory");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
 
-    // UI resource paths
-    public static final String UI_BASE_DIR = "/ui";
-    public static final String UI_RESOURCE_FILE = "ui-files.txt";
-
     // Constants
     public static final String BASE_URL = "/dev-console";
     public static final int DEFAULT_MAX_EVENTS = 1000;
@@ -60,19 +59,21 @@ public class DevConsoleService extends Service {
     public static final String DEV_LOGS_URL = "/logs";
     public static final String DEV_CONFIG_URL = "/config";
 
-    // Configurable fields
-    protected String basePath;
-    protected Integer maxEvents;
-    protected Integer maxLogs;
-
     // Data structures
-    public static final Map<String, String> STATIC_FILES = new HashMap<>();
     public static final Deque<Event<?, ?>> eventHistory = new ConcurrentLinkedDeque<>();
     public static final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
     public static final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
     public static final AtomicInteger totalEvents = new AtomicInteger(0);
 
     public static Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
+    public final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+    public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+
+    // Configurable fields
+    protected String basePath;
+    protected Integer maxEvents;
+    protected Integer maxLogs;
+
 
     @Override
     public void start() {
@@ -135,10 +136,9 @@ public class DevConsoleService extends Service {
         context.info(() -> "[{}] stopped.", name());
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void onEvent(Event<?, ?> event) {
-        event.channel(EVENT_HTTP_REQUEST).flatMap(Event::payloadOpt).ifPresent(request -> handleHttpRequest((Event<HttpObject, HttpObject>) event));
+        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payloadOpt().isPresent()).ifPresent(this::handleHttpRequest);
     }
 
     protected void handleHttpRequest(final Event<HttpObject, HttpObject> event) {
@@ -167,37 +167,6 @@ public class DevConsoleService extends Service {
         }
     }
 
-    /* Experimental: Can replace the above handleGet(Event) method. However, this is less performant than if/else.
-    protected void handleGet1(Event<HttpObject, HttpObject> event) {
-        switch (match(event.payload())) {
-            case DevInfo __ ->
-                event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
-            case DevEvents __ ->
-                event.respond(responseOk(event.payload(), getEventList(), ContentType.APPLICATION_JSON));
-            case DevLogs __ ->
-                event.respond(responseOk(event.payload(), toJson(logHistory), ContentType.APPLICATION_JSON));
-            case DevConfig __ -> event.respond(responseOk(event.payload(), getConfig(), ContentType.APPLICATION_JSON));
-            case DevHtml __ ->
-                event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
-            case DevUiFile fr -> {
-                if (STATIC_FILES.containsKey(fr.fileName())) {
-                    event.respond(responseOk(event.payload(), STATIC_FILES.get(fr.fileName()), getTypeFromFileExt(fr.fileName())));
-                }
-            }
-            case NoMatch __ -> {}
-        }
-    }
-
-    protected RoutesMatch match(HttpObject request) {
-        if (request.pathMatch(BASE_URL + DEV_INFO_URL)) return new DevInfo();
-        if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) return new DevEvents();
-        if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
-        if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
-        if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
-        if (request.pathMatch(BASE_URL + "/{fileName}")) return new DevUiFile(request.pathParam("fileName"));
-        return new NoMatch();
-    }*/
-
     protected void handlePatch(Event<HttpObject, HttpObject> event) {
         if (event.payload().pathMatch(BASE_URL + DEV_CONFIG_URL)) {
             event.respond(responseOk(event.payload(), updateConfig(event.payload().bodyAsJson()), event.payload().contentType()));
@@ -220,10 +189,10 @@ public class DevConsoleService extends Service {
     }
 
     protected String getConfig() {
-        return new TypeMap(Map.of(
+        return toJson(Map.of(
             "baseUrl", basePath,
             "maxEvents", maxEvents,
-            "maxLogs", maxLogs)).toJson();
+            "maxLogs", maxLogs));
     }
 
     public String getEventList() {
@@ -249,43 +218,17 @@ public class DevConsoleService extends Service {
             .putR("serviceNames", context.services().stream().map(Service::name).toList())
             .putR("schedulers", context.nano().schedulers().size())
             .putR("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum())
-            .putR("heapMemory", context.nano().heapMemoryUsage())
+            .putR("heapUsage", context.nano().heapMemoryUsage())
             .putR("os", System.getProperty("os.name") + " - " + System.getProperty("os.version"))
             .putR("arch", System.getProperty("os.arch"))
             .putR("java", System.getProperty("java.version"))
             .putR("cores", Runtime.getRuntime().availableProcessors())
+            .putR("cpuUsage", BigDecimal.valueOf(osBean.getProcessCpuLoad() * 100.0).setScale(2, RoundingMode.HALF_UP).doubleValue())
             .putR("threadsNano", NanoThread.activeNanoThreads())
             .putR("threadsActive", NanoThread.activeCarrierThreads())
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
             .putR("totalEvents", totalEvents.get())
-            .putR("timestamp", String.valueOf(Instant.now()));
-    }
-
-    public static void loadStaticFiles() throws IOException {
-        List<String> fileNames = loadStaticFile("/" + UI_RESOURCE_FILE).lines().map(String::trim).filter(fileName -> !fileName.isBlank()).toList();
-        for (String file : fileNames) {
-            STATIC_FILES.put(file, loadStaticFile(file));
-        }
-    }
-
-    public static String loadStaticFile(String fileName) throws IOException {
-        InputStream in = Objects.requireNonNull(
-            DevConsoleService.class.getResourceAsStream(UI_BASE_DIR + "/" + fileName),
-            fileName + " not found in resources");
-        return new String(in.readAllBytes(), StandardCharsets.UTF_8);
-    }
-
-    public static ContentType getTypeFromFileExt(String path) {
-        if (!path.contains(".")) {
-            return ContentType.TEXT_PLAIN;
-        }
-        String ext = path.substring(path.lastIndexOf('.') + 1);
-        return switch (ext) {
-            case "html" -> ContentType.TEXT_HTML;
-            case "css" -> ContentType.TEXT_CSS;
-            case "js" -> ContentType.APPLICATION_JAVASCRIPT;
-            default -> ContentType.TEXT_PLAIN;
-        };
+            .putR("lastUpdated", dateTimeFormatter.format(Instant.now()));
     }
 
     public static void removeLastNElements(Deque<?> deque, final int N) {

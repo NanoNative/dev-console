@@ -13,10 +13,19 @@ let charts = {};
 // Render System Info object into a compact two-column key→value grid inside target
 function renderSystemKV(target, obj){
   if(!target) return;
+
+  const humanizeKey = k => String(k || '')
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^./, c => c.toUpperCase());
+
   const wrap = document.createElement('div');
   wrap.className = 'kv';
   Object.keys(obj || {}).forEach(k=>{
-    const kEl = document.createElement('div'); kEl.className='k'; kEl.textContent=k;
+    const kEl = document.createElement('div'); kEl.className='k'; kEl.textContent=humanizeKey(k);
     const vEl = document.createElement('div'); vEl.className='v';
     const v = obj[k];
     if(Array.isArray(v)){
@@ -103,9 +112,14 @@ function updateChartsWithSystemInfo(systemInfo) {
         charts.events.addPoint(eventCount, timestamp);
     }
 
-    if (charts.heap && systemInfo.heapMemory !== undefined) {
-        const heapPercentage = systemInfo.heapMemory * 100;
+    if (charts.heap && systemInfo.heapUsage !== undefined) {
+        const heapPercentage = systemInfo.heapUsage * 100;
         charts.heap.addPoint(heapPercentage, timestamp);
+    }
+
+    if (charts.cpu && systemInfo.cpuUsage !== undefined) {
+            const cpuPercentage = systemInfo.cpuUsage;
+            charts.cpu.addPoint(cpuPercentage, timestamp);
     }
 }
 
@@ -269,6 +283,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const threadsCanvas = document.getElementById('threadsChart');
     const eventsCanvas = document.getElementById('eventsChart');
     const heapCanvas = document.getElementById('heapChart');
+    const cpuCanvas = document.getElementById('cpuChart');
 
     if (memoryCanvas) {
         charts.memory = new TinyChart(memoryCanvas, {
@@ -302,6 +317,14 @@ document.addEventListener("DOMContentLoaded", () => {
             lineColor: '#dc3545',
             pointColor: '#dc3545'
         });
+    }
+
+    if (cpuCanvas) {
+            charts.cpu = new TinyChart(cpuCanvas, {
+                title: 'Cpu Usage (%)',
+                lineColor: '#6610f2',
+                pointColor: '#6610f2'
+            });
     }
 
     loadData();
