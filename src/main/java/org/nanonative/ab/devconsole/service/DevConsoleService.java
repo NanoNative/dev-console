@@ -122,46 +122,42 @@ public class DevConsoleService extends Service {
 
     @Override
     public void onEvent(Event<?, ?> event) {
-        event.channel(EVENT_HTTP_REQUEST).ifPresent(ev ->
-            ev.payloadOpt()
-                .ifPresent(
-                    request -> handleHttpRequest(ev, request)
-                )
-        );
+        event.channel(EVENT_HTTP_REQUEST).flatMap(Event::payloadOpt).ifPresent(request -> handleHttpRequest((Event<HttpObject, HttpObject>) event, request));
     }
 
     protected void handleHttpRequest(Event<HttpObject, HttpObject> event, HttpObject request) {
-        HttpObject payload = event.payload();
-        if (payload.isMethodGet()) {
-            handleGet(event, request, payload);
-        } else if (payload.isMethodPost()) {
-            handlePost(event, request, payload);
+        if (request.isMethodGet()) {
+            event.respond(handleGet(request));
+        } else if (request.isMethodPost()) {
+            event.respond(handlePost(request));
         }
     }
 
-    protected void handleGet(Event<HttpObject, HttpObject> event, HttpObject request, HttpObject payload) {
+    protected HttpObject handleGet(HttpObject request) {
         if (request.pathMatch(BASE_URL + DEV_INFO_URL)) {
-            event.respond(responseOk(request, toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
+            return responseOk(request, toJson(getSystemInfo()), ContentType.APPLICATION_JSON);
         } else if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) {
-            event.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON));
+            return responseOk(request, getEventList(), ContentType.APPLICATION_JSON);
         } else if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) {
-            event.respond(responseOk(request, toJson(logHistory), ContentType.APPLICATION_JSON));
+            return responseOk(request, toJson(logHistory), ContentType.APPLICATION_JSON);
         } else if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            event.respond(responseOk(payload, getConfig(), ContentType.APPLICATION_JSON));
+            return responseOk(request, getConfig(), ContentType.APPLICATION_JSON);
         } else if (request.pathMatch(BASE_URL + basePath)) {
-            event.respond(responseOk(payload, STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
+            return responseOk(request, STATIC_FILES.get("index.html"), ContentType.TEXT_HTML);
         } else if (request.pathMatch(BASE_URL + "/{fileName}")) {
             String fileName = request.pathParam("fileName");
             if (STATIC_FILES.containsKey(fileName)) {
-                event.respond(responseOk(payload, STATIC_FILES.get(fileName), getTypeFromFileExt(fileName)));
+                return responseOk(request, STATIC_FILES.get(fileName), getTypeFromFileExt(fileName));
             }
         }
+        return null;
     }
 
-    protected void handlePost(Event<HttpObject, HttpObject> event, HttpObject request, HttpObject payload) {
+    protected HttpObject handlePost(HttpObject request) {
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            event.respond(responseOk(payload, updateConfig(payload.bodyAsJson()), ContentType.APPLICATION_JSON));
+            return responseOk(request, updateConfig(request.bodyAsJson()), ContentType.APPLICATION_JSON);
         }
+        return null;
     }
 
     protected String updateConfig(TypeInfo<?> request) {
