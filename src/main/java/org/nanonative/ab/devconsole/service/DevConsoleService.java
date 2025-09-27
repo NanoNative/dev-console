@@ -127,37 +127,35 @@ public class DevConsoleService extends Service {
 
     protected void handleHttpRequest(Event<HttpObject, HttpObject> event, HttpObject request) {
         if (request.isMethodGet()) {
-            event.respond(handleGet(request));
+            handleGet(event, request);
         } else if (request.isMethodPost()) {
-            event.respond(handlePost(request));
+            handlePost(event, request);
         }
     }
 
-    protected HttpObject handleGet(HttpObject request) {
+    protected void handleGet(Event<HttpObject, HttpObject> event, HttpObject request) {
         if (request.pathMatch(BASE_URL + DEV_INFO_URL)) {
-            return responseOk(request, toJson(getSystemInfo()), ContentType.APPLICATION_JSON);
+            event.respond(responseOk(request, toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) {
-            return responseOk(request, getEventList(), ContentType.APPLICATION_JSON);
+            event.respond(responseOk(request, getEventList(), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) {
-            return responseOk(request, toJson(logHistory), ContentType.APPLICATION_JSON);
+            event.respond(responseOk(request, toJson(logHistory), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            return responseOk(request, getConfig(), ContentType.APPLICATION_JSON);
+            event.respond(responseOk(request, getConfig(), ContentType.APPLICATION_JSON));
         } else if (request.pathMatch(BASE_URL + basePath)) {
-            return responseOk(request, STATIC_FILES.get("index.html"), ContentType.TEXT_HTML);
+            event.respond(responseOk(request, STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
         } else if (request.pathMatch(BASE_URL + "/{fileName}")) {
             String fileName = request.pathParam("fileName");
             if (STATIC_FILES.containsKey(fileName)) {
-                return responseOk(request, STATIC_FILES.get(fileName), getTypeFromFileExt(fileName));
+                event.respond(responseOk(request, STATIC_FILES.get(fileName), getTypeFromFileExt(fileName)));
             }
         }
-        return null;
     }
 
-    protected HttpObject handlePost(HttpObject request) {
+    protected void  handlePost(Event<HttpObject, HttpObject> event, HttpObject request) {
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            return responseOk(request, updateConfig(request.bodyAsJson()), ContentType.APPLICATION_JSON);
+            event.respond(responseOk(request, updateConfig(request.bodyAsJson()), ContentType.APPLICATION_JSON));
         }
-        return null;
     }
 
     protected String updateConfig(TypeInfo<?> request) {
