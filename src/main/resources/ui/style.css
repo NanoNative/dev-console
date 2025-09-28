@@ -1,10 +1,12 @@
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    /* Nano brand gradient */
+    background: linear-gradient(135deg, #00D1FF 0%, #0099C7 100%);
     margin: 0;
     padding: 1rem;
     min-height: 100vh;
-    color: #333;
+    /* Nano text.primary (light) */
+    color: #0B0D10;
 }
 
 h1 {
@@ -30,17 +32,17 @@ h2 {
 }
 
 .chart-container {
-    background: #fff;
-    border-radius: 12px;
+    background: #FFFFFF;                     /* Nano light surface */
+    border-radius: 16px;                     /* Nano radius lg */
     padding: 1rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.32); /* Nano shadow md */
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.2);
+    border: 1px solid rgba(0,0,0,0.08);      /* Nano border.subtle (light) */
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .chart-container:hover {
     transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.32);
 }
 .chart-container canvas {
     width: 100%;
@@ -50,7 +52,7 @@ h2 {
 
 .tabs {
     display: flex;
-    border-bottom: 2px solid rgba(255,255,255,0.3);
+    border-bottom: 2px solid rgba(0,0,0,0.08);  /* Nano subtle border */
     margin-bottom: 1rem;
     background: rgba(255,255,255,0.1);
     border-radius: 12px 12px 0 0;
@@ -69,19 +71,35 @@ h2 {
 .tab:hover { background: rgba(255,255,255,0.2); }
 .tab.active {
     background: rgba(255,255,255,0.9);
-    color: #333;
+    color: #0B0D10;                          /* Nano text.primary */
     font-weight: bold;
 }
+
 .tab-content {
+    /* Defaults; can be overridden per-panel via CSS variables below */
+    --panel-bg: #FFFFFF;
+    --tile-bg:  #FFFFFF;
+    --tile-bd:  rgba(0,0,0,0.08);
+
     display: none;
-    background: rgba(255,255,255,0.95);
+    background: var(--panel-bg);             /* panel background (accent-aware) */
     border: none;
     padding: 1.5rem;
-    border-radius: 0 0 12px 12px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    border-radius: 0 0 16px 16px;            /* Nano radius lg on panel corners */
+    box-shadow: 0 8px 24px rgba(0,0,0,0.32); /* Nano shadow md */
     backdrop-filter: blur(10px);
 }
 .tab-content.active { display: block; }
+
+/* Tiles inside panels inherit accent via variables */
+.tab-content .chart-container,
+.tab-content pre,
+.tab-content #system,
+.tab-content .log-view {
+    background: var(--tile-bg);
+    border-color: var(--tile-bd);
+    color: inherit;
+}
 
 /* ====== Pre blocks ====== */
 pre {
@@ -90,20 +108,20 @@ pre {
     font-family: 'Monaco', 'Menlo', monospace;
     font-size: 0.9rem;
     line-height: 1.5;
-    background: #f8f9fa;
+    background: #F6F8FA;                      /* will be overridden inside panels via var */
     padding: 1rem;
     border-radius: 8px;
-    border: 1px solid #e9ecef;
+    border: 1px solid rgba(0,0,0,0.08);
 }
 
 /* ====== System Info container ====== */
 #system {
-    background: rgba(255,255,255,0.95);
+    background: #FFFFFF;                       /* will be overridden inside panels via var */
     border: none;
-    border-radius: 12px;
+    border-radius: 16px;                       /* Nano radius lg */
     padding: 1.5rem;
     margin-bottom: 2rem;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.32);   /* Nano shadow md */
     backdrop-filter: blur(10px);
 }
 
@@ -117,21 +135,21 @@ pre {
 @media (max-width: 900px) {
     #system .kv { grid-template-columns: max-content 1fr; }
 }
-#system .k { color: #4a5166; white-space: nowrap; }
-#system .v { color: #1e2437; word-break: break-word; }
+#system .k { color: #3A4B59; white-space: nowrap; }  /* Nano text.secondary */
+#system .v { color: #0B0D10; word-break: break-word; } /* Nano text.primary */
 #system .arr { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 #system .tag {
     padding: 2px 6px;
     border-radius: 999px;
-    border: 1px solid rgba(0,0,0,0.08);
+    border: 1px solid rgba(0,0,0,0.08);       /* Nano subtle border */
     background: rgba(0,0,0,0.04);
     font-size: 0.75rem;
-    color: #1e2437;
+    color: #0B0D10;                           /* Nano text.primary */
 }
 
 /* Borders for each JSON record in events/logs */
 .log-view .nano-list .nano-row {
-    border-bottom: 1px solid rgba(0,0,0,0.22);
+    border-bottom: 1px solid rgba(0,0,0,0.08); /* Nano subtle border */
     padding: 2px 6px;
 }
 .log-view .nano-list .nano-row:last-child { border-bottom: none; }
@@ -141,9 +159,10 @@ pre {
     position: sticky; top: 0; z-index: 1000;
     display: flex; align-items: center; justify-content: space-between;
     padding: 0.75rem 1rem; margin: 0 0 1rem 0;
-    background: linear-gradient(135deg, rgba(102,126,234,0.25) 0%, rgba(118,75,162,0.25) 100%);
-    backdrop-filter: blur(10px) saturate(120%);
-    border-bottom: 1px solid rgba(255,255,255,0.22);
+    /* Brand-tinted glass using Nano colors */
+    background: linear-gradient(135deg, rgba(0,209,255,0.25) 0%, rgba(0,153,199,0.25) 100%);
+    backdrop-filter: blur(12px) saturate(120%);        /* Nano blur glass = 12px */
+    border-bottom: 1px solid rgba(0,0,0,0.08);         /* Nano subtle border */
     box-shadow: 0 6px 24px rgba(0,0,0,0.25);
 }
 .toolbar .left {
@@ -151,14 +170,15 @@ pre {
 }
 .toolbar .right { display: flex; gap: .5rem; }
 .btn.small {
-    padding: .5rem .75rem; border-radius: 10px;
-    border: 1px solid rgba(255,255,255,0.35);
-    background: rgba(255,255,255,0.14);
-    color: #f7f7ff; cursor: pointer;
+    padding: .5rem .75rem; border-radius: 10px;        /* Nano radius md */
+    border: 1px solid rgba(0,0,0,0.08);                /* Nano subtle border */
+    background: #ffffff;                                /* Solid surface for clarity */
+    color: #0B0D10;                                     /* Nano text.primary */
+    cursor: pointer;
     transition: transform .12s ease, background .15s ease, box-shadow .15s ease, border-color .15s ease;
-    box-shadow: 0 6px 16px rgba(0,0,0,0.25);
+    box-shadow: 0 6px 16px rgba(0,0,0,0.12);
 }
-.btn.small:hover { transform: translateY(-1px); background: rgba(255,255,255,0.22); border-color: rgba(255,255,255,0.45); }
+.btn.small:hover { transform: translateY(-1px); background: #FAFDFF; border-color: #00B3E0; box-shadow: 0 6px 18px rgba(0,0,0,0.14), 0 0 0 3px rgba(0,209,255,0.10); }
 .btn.small:active { transform: translateY(0); box-shadow: 0 4px 12px rgba(0,0,0,0.25) inset; }
 
 /* ====== Eco Dark Mode (true black) ====== */
@@ -166,17 +186,20 @@ body:not(.light) {
     background: #000 !important;
     color: #e6e6e6;
 }
-body:not(.light) h1, body:not(.light) h2 {
-    color: #f5f5f5; text-shadow: none;
-}
-body:not(.light) .chart-container {
-    background: #111; border: 1px solid #222; box-shadow: 0 8px 20px rgba(0,0,0,0.6);
-}
+body:not(.light) h1, body:not(.light) h2 { color: #f5f5f5; text-shadow: none; }
+body:not(.light) .chart-container { background: #111; border: 1px solid #222; box-shadow: 0 8px 20px rgba(0,0,0,0.6); }
 body:not(.light) .tabs { background: #0f0f0f; border-bottom: 1px solid #222; }
 body:not(.light) .tab { background: #161616; color: #fff; }
 body:not(.light) .tab:hover { background: #1f1f1f; }
 body:not(.light) .tab.active { background: #222; color: #fff; font-weight: 600; }
-body:not(.light) .tab-content { background: #0f0f0f; border: 1px solid #222; color: #e6e6e6; }
+body:not(.light) .tab-content {
+  --panel-bg: #0f0f0f;   /* panel surface */
+  --tile-bg:  #111;      /* tiles inside panel */
+  --tile-bd:  #222;      /* subtle borders */
+  background: var(--panel-bg);
+  border: 1px solid var(--tile-bd);
+  color: #e6e6e6;
+}
 body:not(.light) pre { background: #0a0a0a; border: 1px solid #1a1a1a; color: #e6e6e6; }
 body:not(.light) #system { background: #0f0f0f; border: 1px solid #1a1a1a; }
 body:not(.light) .toolbar { background: #0b0b0b; border-bottom-color: #1a1a1a; box-shadow: none; }
@@ -188,40 +211,61 @@ body:not(.light) #system .tag { background: #111; border-color: #333; color: #d1
 
 /* ====== Light Mode (consolidated) ====== */
 body.light {
-    background: linear-gradient(135deg, #5761ee 0%, #7a37a3 100%) !important;
-    color: #000;
+    background: linear-gradient(135deg, #00D1FF 0%, #0099C7 100%) !important; /* Nano brand */
+    color: #0B0D10;
 }
 body.light h1, body.light h2 {
-  color: #111;
-  text-shadow: none;
+  color: #FFFFFF;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.35);
 }
 body.light .toolbar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  background: linear-gradient(135deg, rgba(0,209,255,0.25) 0%, rgba(0,153,199,0.25) 100%) !important;
   color: #fff;
-  border-bottom-color: #cfd2ff;
+  border-bottom-color: rgba(0,0,0,0.08);
 }
 body.light .toolbar .left { color: #fff; }
+
 /* Buttons on light */
-body.light .btn.small { border-color: #d0d4e0; background: #ffffff; color: #1d2333; box-shadow: 0 4px 12px rgba(31,35,53,0.12); }
+body.light .btn.small { border-color: rgba(0,0,0,0.08); background: #ffffff; color: #0B0D10; box-shadow: 0 4px 12px rgba(0,0,0,0.10); }
+
 /* Tabs container/buttons */
-body.light .tabs { background: #ffffff; border-bottom: 1px solid #e5e7ef; }
-body.light .tab { color: #111; border: 0; }
-body.light .tab.active { background: rgba(255,255,255,0.9); color: #111; }
-/* Colored content backgrounds (data areas) */
-body.light #logs.tab-content, body.light #logs { background: #fff8d6 !important; border: 1px solid #eadf9c; color: #111; }
-body.light #events.tab-content, body.light #events { background: #e8f7ee !important; border: 1px solid #cfe9db; color: #111; }
-body.light #system { background: #e7f2ff !important; border: 1px solid #cfe3ff !important; color: #0b2a4a; }
-body.light #system .k { color: #111; }
-body.light #system .v { color: #000; }
-/* Make inner <pre> transparent so parent color shows */
-body.light #logs .log-view, body.light #events .log-view {
-    background: transparent !important; border-color: transparent !important; color: #111 !important;
+body.light .tabs { background: #ffffff; border-bottom: 1px solid rgba(0,0,0,0.08); }
+body.light .tab { color: #0B0D10; }
+body.light .tab:hover { color: #0B0D10; }
+body.light .tab.active { background: rgba(255,255,255,0.9); color: #0B0D10; }
+
+/* Accent tabs (button background + underline) */
+body.light .tab[data-tab="events"] { color: #8A5CFF; background: rgba(138,92,255,0.10); }
+body.light .tab:hover[data-tab="events"] { background: rgba(138,92,255,0.16); }
+body.light .tab.active[data-tab="events"] { background: linear-gradient(180deg, rgba(138,92,255,0.18) 0%, rgba(138,92,255,0.24) 100%); color: #0B0D10; box-shadow: inset 0 -2px 0 0 #8A5CFF; }
+
+body.light .tab[data-tab="logs"] { color: #FF9A3C; background: rgba(255,154,60,0.12); }
+body.light .tab:hover[data-tab="logs"] { background: rgba(255,154,60,0.18); }
+body.light .tab.active[data-tab="logs"] { background: linear-gradient(180deg, rgba(255,154,60,0.20) 0%, rgba(255,154,60,0.26) 100%); color: #0B0D10; box-shadow: inset 0 -2px 0 0 #FF9A3C; }
+
+body.light .tab[data-tab="config"] { color: #00E6A8; background: rgba(0,230,168,0.10); }
+body.light .tab:hover[data-tab="config"] { background: rgba(0,230,168,0.16); }
+body.light .tab.active[data-tab="config"] { background: linear-gradient(180deg, rgba(0,230,168,0.18) 0%, rgba(0,230,168,0.24) 100%); color: #0B0D10; box-shadow: inset 0 -2px 0 0 #00E6A8; }
+
+/* Panel accent variables (drive both panel and its inner tiles) */
+/* Use layered backgrounds: accent wash over a white base so the page gradient doesn't bleed through */
+body.light #events.tab-content {
+  --panel-bg: linear-gradient(180deg, rgba(138,92,255,0.14) 0%, rgba(138,92,255,0.24) 100%), #FFFFFF;
+  --tile-bg:  linear-gradient(180deg, rgba(138,92,255,0.10) 0%, rgba(138,92,255,0.16) 100%), #FFFFFF;
+  --tile-bd:  rgba(138,92,255,0.28);
 }
-/* Light mode: match tab buttons to their content colors */
-body.light .tab[data-tab="logs"] { background: #fff8d6; color: #4a3b00; }
-body.light .tab.active[data-tab="logs"] { background: #fff1a8; color: #3a2d00; }
-body.light .tab[data-tab="events"] { background: #e8f7ee; color: #0b3d20; }
-body.light .tab.active[data-tab="events"] { background: #d6efdf; color: #08351a; }
+
+body.light #logs.tab-content {
+  --panel-bg: linear-gradient(180deg, rgba(255,154,60,0.14) 0%, rgba(255,154,60,0.24) 100%), #FFFFFF;
+  --tile-bg:  linear-gradient(180deg, rgba(255,154,60,0.10) 0%, rgba(255,154,60,0.16) 100%), #FFFFFF;
+  --tile-bd:  rgba(255,154,60,0.32);
+}
+
+body.light #config.tab-content {
+  --panel-bg: linear-gradient(180deg, rgba(0,230,168,0.14) 0%, rgba(0,230,168,0.24) 100%), #FFFFFF;
+  --tile-bg:  linear-gradient(180deg, rgba(0,230,168,0.10) 0%, rgba(0,230,168,0.16) 100%), #FFFFFF;
+  --tile-bd:  rgba(0,230,168,0.30);
+}
 
 /* Config form layout */
 .config-form { display: grid; gap: 12px; max-width: 560px; }
@@ -230,9 +274,9 @@ body.light .tab.active[data-tab="events"] { background: #d6efdf; color: #08351a;
 .config-form input[type="number"],
 .config-form input[type="text"] {
     padding: 8px 10px; border-radius: 8px; border: 1px solid #d6d9e6; outline: none;
-    background: #fff; color: #111; font-size: 14px;
+    background: #fff; color: #0B0D10; font-size: 14px;
 }
-.config-form input:focus { border-color: #7a37a3; box-shadow: 0 0 0 3px rgba(122,55,163,0.15); }
+.config-form input:focus { border-color: #00B3E0; box-shadow: 0 0 0 3px rgba(0,209,255,0.15); }
 .config-form .actions { margin-top: 8px; }
 .btn[disabled], .btn:disabled { opacity: .55; cursor: not-allowed; }
 
@@ -240,33 +284,139 @@ body.light .tab.active[data-tab="events"] { background: #d6efdf; color: #08351a;
 .toast {
     position: fixed; right: 16px; bottom: 16px;
     padding: 10px 14px; border-radius: 10px; font-weight: 600;
-    color: #0b2a0b; background: #d9f7da; border: 1px solid #a9e7ad;
+    color: #0b2a0b; background: rgba(46,204,113,0.10); border: 1px solid rgba(46,204,113,0.55);
     box-shadow: 0 10px 32px rgba(0,0,0,0.18);
     opacity: 0; pointer-events: none; transform: translateY(10px);
     transition: opacity .15s ease, transform .15s ease;
 }
 .toast.show { opacity: 1; transform: translateY(0); pointer-events: auto; }
-.toast.error { background: #ffe3e3; color: #5a0b0b; border-color: #ffb3b3; }
-
-/* Dark-mode input/toast tweaks */
-body:not(.light) #config .config-form input { background: #0f0f0f; color: #e6e6e6; border-color: #2a2a2a; }
-body:not(.light) .toast { background: #112611; color: #c8f3cc; border-color: #204b21; }
-body:not(.light) .toast.error { background: #2a1111; color: #ffd6d6; border-color: #4b2020; }
+.toast.error { background: rgba(255,92,92,0.12); color: #5a0b0b; border-color: rgba(255,92,92,0.55); }
 
 /* Config validation errors */
 .config-form .field.error input {
-  border-color: #e53935 !important;
-  box-shadow: 0 0 0 3px rgba(229,57,53,.15) !important;
+  border-color: #FF5C5C !important;
+  box-shadow: 0 0 0 3px rgba(255,92,92,.15) !important;
 }
-.config-form .error-msg {
-  color: #e53935;
-  font-size: 12px;
-  margin-top: 4px;
-}
+.config-form .error-msg { color: #e53935; font-size: 12px; margin-top: 4px; }
 body:not(.light) .config-form .field.error input {
   border-color: #ff6b6b !important;
   box-shadow: 0 0 0 3px rgba(255,107,107,.15) !important;
 }
-body:not(.light) .config-form .error-msg {
-  color: #ff9aa2;
+body:not(.light) .config-form .error-msg { color: #ff9aa2; }
+
+/* Dark-mode toast visibility + contrast */
+body:not(.light) .toast {
+  background: rgba(46,204,113,0.12);
+  color: #CFF5DD;
+  border: 1px solid rgba(46,204,113,0.55);
 }
+body:not(.light) .toast.error {
+  background: rgba(255,92,92,0.12);
+  color: #FFD4D4;
+  border-color: rgba(255,92,92,0.55);
+}
+body:not(.light) .toast.show {
+  opacity: 1 !important;
+  transform: translateY(0) !important;
+  pointer-events: auto;
+}
+
+/* Header layout & typography */
+.title-head{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:.6rem;                                  /* space between icon & text */
+  font-size: clamp(28px, 3vw, 56px);
+  line-height: 1.1;
+  color:#fff;                                 /* works over your cyan header */
+  text-shadow: 0 2px 10px rgba(0,0,0,.2);
+  margin: 20px 0 28px;                        /* adjust as you like */
+}
+
+.title-head .icon{
+  width: clamp(40px, 4vw, 72px);
+  height: clamp(40px, 4vw, 72px);
+  stroke-width: 3;                            /* thicker lines for big headers */
+  filter: drop-shadow(0 6px 16px rgba(0,0,0,.25));
+  vertical-align: middle;
+  transform: translateY(1px);                 /* tiny optical alignment */
+}
+
+@media (max-width: 480px){
+  .title-head{ gap:.45rem; }
+}
+
+/* ====== Toolbar menu (hamburger) ====== */
+.toolbar .right { position: relative; display: flex; align-items: center; }
+
+/* Make the trigger blend with the toolbar and center the icon */
+.menu-trigger{
+  /* neutralize default .btn look */
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+
+  /* size & centering */
+  width: 36px; height: 36px;
+  display: grid; place-items: center;   /* perfect centering */
+  padding: 0;
+  border-radius: 12px;
+  color: #fff;                          /* inherits well on your cyan header */
+  cursor: pointer;
+}
+
+/* hover/focus feedback without white fill */
+.menu-trigger:hover{ background: rgba(255,255,255,0.12); }
+.menu-trigger:focus-visible{
+  outline: 2px solid rgba(255,255,255,0.65);
+  outline-offset: 2px;
+}
+.menu-trigger:active{ transform: translateY(1px); }
+
+/* size the icon */
+.menu-trigger .hamb{ width: 20px; height: 20px; }
+
+/* Dark/light variants if you flip themes by toggling .light */
+body.light .menu-trigger{ color: #0B0D10; }
+body.light .menu-trigger:hover{ background: rgba(0,0,0,0.06); }
+
+
+
+.menu-trigger { width: 2.25rem; height: 2.25rem; padding: 0; font-size: 1rem; }
+
+.menu {
+  position: absolute;
+  top: 110%;                 /* just below the trigger */
+  right: 0;
+  min-width: 220px;
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.08);
+  border-radius: 12px;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.25);
+  padding: .35rem;
+  display: none;             /* hidden by default */
+  z-index: 1001;
+}
+
+.menu.open { display: block; }
+
+.menu-item {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  padding: .6rem .75rem;
+  border-radius: 8px;
+  font: inherit;
+  color: #0B0D10;
+  cursor: pointer;
+}
+
+.menu-item:hover { background: rgba(0,0,0,0.05); }
+
+/* Dark mode variants */
+body:not(.light) .menu { background: #121212; border-color: #222; box-shadow: 0 14px 40px rgba(0,0,0,0.5); }
+body:not(.light) .menu-item { color: #e6e6e6; }
+body:not(.light) .menu-item:hover { background: rgba(255,255,255,0.06); }
+

@@ -179,8 +179,12 @@ function clearFieldError(inputEl){
   field.classList.remove('error');
   const em = field.querySelector('.error-msg'); if (em) em.remove();
 }
-const isPosIntStr = (s) => /^[1-9]\d*$/.test(s);          // >0 integers only
-const isBaseUrlOK = (s) => /^\/[^/]+$/.test(s);            // starts with "/" and no more slashes
+
+// >0 integers only, max 9999
+const isPosIntStr = s => /^[1-9]\d{0,3}$/.test(String(s).trim()); // 1..9999
+
+// starts with "/" + no other "/" + max length 16 total
+const isBaseUrlOK = s => /^\/[^/]{1,15}$/.test(String(s).trim());
 
 // Compute diff vs the original config; enable/disable Update button
 function computeConfigDiff(){
@@ -200,9 +204,9 @@ function computeConfigDiff(){
 
   // Validate current values
   let valid = true;
-  if (!isPosIntStr(draft.maxEvents)) { setFieldError(maxEventsEl, 'Enter a positive integer'); valid = false; }
-  if (!isPosIntStr(draft.maxLogs))   { setFieldError(maxLogsEl,   'Enter a positive integer'); valid = false; }
-  if (!isBaseUrlOK(draft.baseUrl))   { setFieldError(baseUrlEl,   'Must start with "/" and no other "/"'); valid = false; }
+  if (!isPosIntStr(draft.maxEvents)) { setFieldError(maxEventsEl, 'Enter a positive integer (1–9999)'); valid = false; }
+  if (!isPosIntStr(draft.maxLogs))   { setFieldError(maxLogsEl,   'Enter a positive integer (1–9999)'); valid = false; }
+  if (!isBaseUrlOK(draft.baseUrl))   { setFieldError(baseUrlEl,   'Must start with "/" (no other "/"), minimum=2 & maximum=16 characters'); valid = false; }
 
   // Build changed map only when values differ from originals
   const changed = {};
@@ -410,4 +414,27 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initialize button wiring when DOM is ready
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
   else wire();
+})();
+
+// Toolbar hamburger dropdown
+(() => {
+  const btn  = document.getElementById('toolbarMenuBtn');
+  const menu = document.getElementById('toolbarMenu');
+  if (!btn || !menu) return;
+
+  const open = () => { menu.classList.add('open'); btn.setAttribute('aria-expanded','true'); };
+  const close = () => { menu.classList.remove('open'); btn.setAttribute('aria-expanded','false'); };
+  const toggle = () => menu.classList.contains('open') ? close() : open();
+
+  btn.addEventListener('click', (e) => { e.stopPropagation(); toggle(); });
+
+  // Close on outside click / Escape
+  document.addEventListener('click', (e) => { if (!menu.contains(e.target)) close(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+
+  // Optional: close after clicking any menu item
+  menu.addEventListener('click', (e) => {
+    const target = e.target.closest('.menu-item');
+    if (target) setTimeout(close, 0);
+  });
 })();
