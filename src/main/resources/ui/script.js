@@ -354,7 +354,7 @@ document.addEventListener("DOMContentLoaded", () => {
   function setThemeIcon(){
     const btn = $("#nanoThemeBtn"); if(!btn) return;
     const isLight = document.body.classList.contains('light');
-    btn.textContent = isLight ? "🌿" : "☀️";
+    btn.textContent = isLight ? "🌿 Eco mode" : "☀️Original";
   }
 
   // Toggle between light and dark theme and persist the choice
