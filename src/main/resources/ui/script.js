@@ -183,8 +183,8 @@ function clearFieldError(inputEl){
 // >0 integers only, max 9999
 const isPosIntStr = s => /^[1-9]\d{0,3}$/.test(String(s).trim()); // 1..9999
 
-// starts with "/" + no other "/" + max length 16 total
-const isBaseUrlOK = s => /^\/[^/]{1,15}$/.test(String(s).trim());
+// baseUrl: "/" + [a-zA-Z0-9-] only, total length 2..16, no other "/"
+const isBaseUrlOK = s => /^\/[A-Za-z0-9-]{1,15}$/.test(String(s).trim());
 
 // Compute diff vs the original config; enable/disable Update button
 function computeConfigDiff(){
@@ -206,7 +206,7 @@ function computeConfigDiff(){
   let valid = true;
   if (!isPosIntStr(draft.maxEvents)) { setFieldError(maxEventsEl, 'Enter a positive integer (1–9999)'); valid = false; }
   if (!isPosIntStr(draft.maxLogs))   { setFieldError(maxLogsEl,   'Enter a positive integer (1–9999)'); valid = false; }
-  if (!isBaseUrlOK(draft.baseUrl))   { setFieldError(baseUrlEl,   'Must start with "/" (no other "/"), minimum=2 & maximum=16 characters'); valid = false; }
+  if (!isBaseUrlOK(draft.baseUrl))   { setFieldError(baseUrlEl,   'Format: "/" followed by maximum 15 characters of [A–Z a–z 0–9 -]'); valid = false; }
 
   // Build changed map only when values differ from originals
   const changed = {};
@@ -332,7 +332,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     loadData();
-    setInterval(loadData, 5000);
+    setInterval(loadData, 2000);
 
     // Config form wiring (if present)
     const form = document.getElementById('configForm');

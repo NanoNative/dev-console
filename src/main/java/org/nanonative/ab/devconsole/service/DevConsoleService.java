@@ -5,6 +5,14 @@ import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMapI;
 import com.sun.management.OperatingSystemMXBean;
+import org.nanonative.ab.devconsole.util.DevConfig;
+import org.nanonative.ab.devconsole.util.DevEvents;
+import org.nanonative.ab.devconsole.util.DevHtml;
+import org.nanonative.ab.devconsole.util.DevInfo;
+import org.nanonative.ab.devconsole.util.DevLogs;
+import org.nanonative.ab.devconsole.util.DevUi;
+import org.nanonative.ab.devconsole.util.NoMatch;
+import org.nanonative.ab.devconsole.util.RoutesMatch;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
@@ -59,20 +67,20 @@ public class DevConsoleService extends Service {
     public static final String DEV_LOGS_URL = "/logs";
     public static final String DEV_CONFIG_URL = "/config";
 
-    // Data structures
-    public static final Deque<Event<?, ?>> eventHistory = new ConcurrentLinkedDeque<>();
-    public static final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
-    public static final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
-    public static final AtomicInteger totalEvents = new AtomicInteger(0);
-
     public static Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
-    public final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+    public static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
     // Configurable fields
     protected String basePath;
     protected Integer maxEvents;
     protected Integer maxLogs;
+
+    // Data structures
+    protected final Deque<Event<?, ?>> eventHistory = new ConcurrentLinkedDeque<>();
+    protected final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
+    protected final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
+    protected final AtomicInteger totalEvents = new AtomicInteger(0);
 
 
     @Override
@@ -90,13 +98,27 @@ public class DevConsoleService extends Service {
     @SuppressWarnings("ConstantConditions")
     protected void checkForNewChannelsAndSubscribe() {
         NanoBase.EVENT_CHANNELS.values().forEach(channel -> {
-            if (channel != EVENT_APP_HEARTBEAT && subscribedChannels.add(channel)) {
+            if (subscribedChannels.add(channel)) {
                 context.subscribeEvent(channel, this::recordEvent);
             }
         });
     }
 
+    @SuppressWarnings("unchecked")
     protected void recordEvent(Event<?, ?> event) {
+        totalEvents.incrementAndGet();
+        // Exclude EVENT_APP_HEARTBEAT events from the list
+        if (event.channel().equals(EVENT_APP_HEARTBEAT))
+            return;
+        // Exclude Dev console Http events from the list
+        if (event.channel().equals(EVENT_HTTP_REQUEST) && event.payload() instanceof HttpObject payload) {
+            RoutesMatch route = match(payload);
+            if (!(route instanceof NoMatch)) {
+                handleHttpRequest((Event<HttpObject, HttpObject>) event, route);
+                return;
+            }
+        }
+
         if (!event.channel().equals(EVENT_LOGGING)) {
             if (eventHistory.size() >= maxEvents) {
                 removeLastNElements(eventHistory, eventHistory.size() - maxEvents + 1);
@@ -109,66 +131,45 @@ public class DevConsoleService extends Service {
             }
             logHistory.addFirst(logFormatter.format((LogRecord) event.payload()));
         }
-        totalEvents.incrementAndGet();
     }
 
-    @Override
-    public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
-        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
-        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
-        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
-
-        if (maxEvents < eventHistory.size()) {
-            removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
-        }
-        if (maxLogs < logHistory.size()) {
-            removeLastNElements(logHistory, logHistory.size() - maxLogs);
-        }
+    // Add dev console routes below
+    protected RoutesMatch match(HttpObject request) {
+        if (request.pathMatch(BASE_URL + DEV_INFO_URL)) return new DevInfo();
+        if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) return new DevEvents();
+        if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
+        if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
+        if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
+        if (request.pathMatch(BASE_URL + "/{fileName}")) return new DevUi(request.pathParam("fileName"));
+        return new NoMatch();
     }
 
-    @Override
-    public Object onFailure(Event event) {
-        return null;
-    }
-
-    @Override
-    public void stop() {
-        context.info(() -> "[{}] stopped.", name());
-    }
-
-    @Override
-    public void onEvent(Event<?, ?> event) {
-        event.channel(EVENT_HTTP_REQUEST).filter(ev -> ev.payloadOpt().isPresent()).ifPresent(this::handleHttpRequest);
-    }
-
-    protected void handleHttpRequest(final Event<HttpObject, HttpObject> event) {
+    protected void handleHttpRequest(final Event<HttpObject, HttpObject> event, final RoutesMatch route) {
         switch (event.payload().methodType()) {
-            case GET -> handleGet(event);
-            case PATCH -> handlePatch(event);
+            case GET -> handleGet(event, route);
+            case PATCH -> handlePatch(event, route);
         }
     }
 
-    protected void handleGet(Event<HttpObject, HttpObject> event) {
-        if (event.payload().pathMatch(BASE_URL + DEV_INFO_URL)) {
-            event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
-        } else if (event.payload().pathMatch(BASE_URL + DEV_EVENTS_URL)) {
-            event.respond(responseOk(event.payload(), getEventList(), ContentType.APPLICATION_JSON));
-        } else if (event.payload().pathMatch(BASE_URL + DEV_LOGS_URL)) {
-            event.respond(responseOk(event.payload(), toJson(logHistory), ContentType.APPLICATION_JSON));
-        } else if (event.payload().pathMatch(BASE_URL + DEV_CONFIG_URL)) {
-            event.respond(responseOk(event.payload(), getConfig(), ContentType.APPLICATION_JSON));
-        } else if (event.payload().pathMatch(BASE_URL + basePath)) {
-            event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
-        } else if (event.payload().pathMatch(BASE_URL + "/{fileName}")) {
-            String fileName = event.payload().pathParam("fileName");
-            if (STATIC_FILES.containsKey(fileName)) {
-                event.respond(responseOk(event.payload(), STATIC_FILES.get(fileName), getTypeFromFileExt(fileName)));
-            }
+    protected void handleGet(Event<HttpObject, HttpObject> event, RoutesMatch route) {
+        switch (route) {
+            case DevInfo __ ->
+                event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
+            case DevEvents __ ->
+                event.respond(responseOk(event.payload(), getEventList(), ContentType.APPLICATION_JSON));
+            case DevLogs __ ->
+                event.respond(responseOk(event.payload(), toJson(logHistory), ContentType.APPLICATION_JSON));
+            case DevConfig __ -> event.respond(responseOk(event.payload(), getConfig(), ContentType.APPLICATION_JSON));
+            case DevHtml __ ->
+                event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
+            case DevUi fileRequest ->
+                event.respond(responseOk(event.payload(), STATIC_FILES.get(fileRequest.fileName()), getTypeFromFileExt(fileRequest.fileName())));
+            case NoMatch __ -> {}
         }
     }
 
-    protected void handlePatch(Event<HttpObject, HttpObject> event) {
-        if (event.payload().pathMatch(BASE_URL + DEV_CONFIG_URL)) {
+    protected void handlePatch(Event<HttpObject, HttpObject> event, RoutesMatch route) {
+        if (route instanceof DevConfig) {
             event.respond(responseOk(event.payload(), updateConfig(event.payload().bodyAsJson()), event.payload().contentType()));
         }
     }
@@ -228,8 +229,37 @@ public class DevConsoleService extends Service {
             .putR("threadsActive", NanoThread.activeCarrierThreads())
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
             .putR("totalEvents", totalEvents.get())
+            .putR("lastLogsRetained", logHistory.size())
+            .putR("lastEventsRetained", eventHistory.size())
             .putR("lastUpdated", dateTimeFormatter.format(Instant.now()));
     }
+
+    @Override
+    public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
+        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
+        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
+        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
+
+        if (maxEvents < eventHistory.size()) {
+            removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
+        }
+        if (maxLogs < logHistory.size()) {
+            removeLastNElements(logHistory, logHistory.size() - maxLogs);
+        }
+    }
+
+    @Override
+    public Object onFailure(Event event) {
+        return null;
+    }
+
+    @Override
+    public void stop() {
+        context.info(() -> "[{}] stopped.", name());
+    }
+
+    @Override
+    public void onEvent(Event<?, ?> event) {}
 
     public static void removeLastNElements(Deque<?> deque, final int N) {
         for (int i = 0; i < N; i++) {

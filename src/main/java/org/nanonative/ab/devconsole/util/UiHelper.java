@@ -21,7 +21,7 @@ public class UiHelper {
     private UiHelper() {}
 
     public static void loadStaticFiles() throws IOException {
-        List<String> fileNames = loadStaticFile("/" + UI_RESOURCE_FILE).lines().map(String::trim).filter(fileName -> !fileName.isBlank()).toList();
+        List<String> fileNames = loadStaticFile(UI_RESOURCE_FILE).lines().map(String::trim).filter(fileName -> !fileName.isBlank()).toList();
         for (String file : fileNames) {
             STATIC_FILES.put(file, loadStaticFile(file));
         }
