@@ -27,6 +27,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
@@ -158,7 +159,7 @@ public class DevConsoleService extends Service {
             case DevEvents __ ->
                 event.respond(responseOk(event.payload(), getEventList(), ContentType.APPLICATION_JSON));
             case DevLogs __ ->
-                event.respond(responseOk(event.payload(), toJson(logHistory), ContentType.APPLICATION_JSON));
+                event.respond(responseOk(event.payload(), toJson(new ArrayList<>(logHistory)), ContentType.APPLICATION_JSON));
             case DevConfig __ -> event.respond(responseOk(event.payload(), getConfig(), ContentType.APPLICATION_JSON));
             case DevHtml __ ->
                 event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
@@ -198,7 +199,7 @@ public class DevConsoleService extends Service {
 
     public String getEventList() {
         TypeList eventsList = new TypeList();
-        for (Event<?, ?> e : eventHistory) {
+        for (Event<?, ?> e : new ArrayList<>(eventHistory)) {
             LinkedTypeMap eventMap = new LinkedTypeMap()
                 .putR("channel", e.channel().name())
                 .putR("isAck", e.isAcknowledged())
