@@ -34,6 +34,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
@@ -82,6 +83,7 @@ public class DevConsoleService extends Service {
     protected final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
     protected final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
     protected final AtomicInteger totalEvents = new AtomicInteger(0);
+    protected final ReentrantLock lock = new ReentrantLock();
 
 
     @Override
@@ -262,9 +264,11 @@ public class DevConsoleService extends Service {
     @Override
     public void onEvent(Event<?, ?> event) {}
 
-    public static void removeLastNElements(Deque<?> deque, final int N) {
+    public void removeLastNElements(Deque<?> deque, final int N) {
+        lock.lock();
         for (int i = 0; i < N; i++) {
             deque.removeLast();
         }
+        lock.unlock();
     }
 }
