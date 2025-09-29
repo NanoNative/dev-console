@@ -37,8 +37,8 @@ mvn clean install
 ```xml
 <!-- Dev Console -->
 <dependency>
-  <groupId>org.nanonative.ab</groupId>
-  <artifactId>nano-dev-console</artifactId>
+  <groupId>org.nanonative</groupId>
+  <artifactId>devconsole</artifactId>
   <version>1.0.0</version>
 </dependency>
 
@@ -54,7 +54,7 @@ Once on the classpath, the service starts with your app and exposes the UI.
 ```java
         Nano nano = new Nano(Map.of(
             CONFIG_SERVICE_HTTP_PORT, "8080"
-        ), new DevConsoleService(), new HttpServer(), new MyAppService(), ...);
+        ), new DevConsoleService(), new HttpServer(), new MyAppService(), new OtherAppService());
 
 ```
 ---
@@ -114,7 +114,7 @@ You can **pause** charts to inspect, and **export** events/logs as text.
   <artifactId>exec-maven-plugin</artifactId>
   <version>3.2.0</version>
   <configuration>
-    <mainClass>org.nanonative.ab.devconsole.Main</mainClass>
+    <mainClass>org.nanonative.devconsole.Main</mainClass>
   </configuration>
 </plugin>
 ```

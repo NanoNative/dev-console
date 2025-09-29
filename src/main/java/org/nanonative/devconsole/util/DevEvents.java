@@ -1,3 +1,3 @@
-package org.nanonative.ab.devconsole.util;
+package org.nanonative.devconsole.util;
 
 public record DevEvents() implements RoutesMatch {}

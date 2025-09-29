@@ -1,6 +1,6 @@
-package org.nanonative.ab.devconsole.util;
+package org.nanonative.devconsole.util;
 
-import org.nanonative.ab.devconsole.service.DevConsoleService;
+import org.nanonative.devconsole.service.DevConsoleService;
 
 import java.io.IOException;
 import java.io.InputStream;

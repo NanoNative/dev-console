@@ -1,4 +1,4 @@
-package org.nanonative.ab.devconsole.util;
+package org.nanonative.devconsole.util;
 
 import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;

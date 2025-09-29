@@ -1,4 +1,4 @@
-package org.nanonative.ab.devconsole.service;
+package org.nanonative.devconsole.service;
 
 import org.junit.jupiter.api.Test;
 import org.nanonative.nano.core.Nano;
@@ -10,17 +10,17 @@ import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.util.Map;
 
-import static org.nanonative.ab.devconsole.service.DevConsoleService.BASE_URL;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.CONFIG_DEV_CONSOLE_URL;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.DEFAULT_MAX_EVENTS;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.DEFAULT_MAX_LOGS;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.DEFAULT_UI_URL;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.DEV_CONFIG_URL;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.DEV_EVENTS_URL;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.DEV_INFO_URL;
-import static org.nanonative.ab.devconsole.service.DevConsoleService.DEV_LOGS_URL;
+import static org.nanonative.devconsole.service.DevConsoleService.BASE_URL;
+import static org.nanonative.devconsole.service.DevConsoleService.CONFIG_DEV_CONSOLE_URL;
+import static org.nanonative.devconsole.service.DevConsoleService.DEFAULT_MAX_EVENTS;
+import static org.nanonative.devconsole.service.DevConsoleService.DEFAULT_MAX_LOGS;
+import static org.nanonative.devconsole.service.DevConsoleService.DEFAULT_UI_URL;
+import static org.nanonative.devconsole.service.DevConsoleService.DEV_CONFIG_URL;
+import static org.nanonative.devconsole.service.DevConsoleService.DEV_EVENTS_URL;
+import static org.nanonative.devconsole.service.DevConsoleService.DEV_INFO_URL;
+import static org.nanonative.devconsole.service.DevConsoleService.DEV_LOGS_URL;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.nanonative.ab.devconsole.util.UiHelper.STATIC_FILES;
+import static org.nanonative.devconsole.util.UiHelper.STATIC_FILES;
 
 class DevConsoleServiceTest {
 
