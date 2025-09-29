@@ -1,64 +1,258 @@
 package org.nanonative.ab.devconsole.service;
 
+import berlin.yuna.typemap.model.LinkedTypeMap;
+import berlin.yuna.typemap.model.TypeInfo;
+import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMapI;
-import org.nanonative.ab.devconsole.model.EventWrapper;
+import com.sun.management.OperatingSystemMXBean;
+import org.nanonative.ab.devconsole.util.DevConfig;
+import org.nanonative.ab.devconsole.util.DevEvents;
+import org.nanonative.ab.devconsole.util.DevHtml;
+import org.nanonative.ab.devconsole.util.DevInfo;
+import org.nanonative.ab.devconsole.util.DevLogs;
+import org.nanonative.ab.devconsole.util.DevUi;
+import org.nanonative.ab.devconsole.util.NoMatch;
+import org.nanonative.ab.devconsole.util.RoutesMatch;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
-import org.nanonative.nano.helper.ExRunnable;
 import org.nanonative.nano.helper.event.model.Event;
+import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
-import java.io.InputStream;
 import java.lang.management.ManagementFactory;
-import java.nio.charset.StandardCharsets;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import berlin.yuna.typemap.logic.JsonEncoder;
-import berlin.yuna.typemap.model.ConcurrentTypeSet;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Formatter;
+import java.util.logging.LogRecord;
 
-import static java.util.concurrent.TimeUnit.SECONDS;
-import static  org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
+import berlin.yuna.typemap.model.ConcurrentTypeSet;
+import org.nanonative.nano.services.logging.LogFormatRegister;
+
+import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
+import static org.nanonative.ab.devconsole.util.ResponseHelper.getTypeFromFileExt;
+import static org.nanonative.ab.devconsole.util.ResponseHelper.responseOk;
+import static org.nanonative.ab.devconsole.util.UiHelper.STATIC_FILES;
+import static org.nanonative.ab.devconsole.util.UiHelper.loadStaticFiles;
+import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
+import static org.nanonative.nano.core.model.Context.EVENT_CONFIG_CHANGE;
 import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
+import static org.nanonative.nano.services.http.HttpServer.EVENT_HTTP_REQUEST;
+import static org.nanonative.nano.services.logging.LogService.EVENT_LOGGING;
 
 public class DevConsoleService extends Service {
 
-    // All modifications to eventHistory must be thread safe
-    private final Deque<EventWrapper> eventHistory = new ConcurrentLinkedDeque<>();
-    private final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
-    public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in the DevConsoleService");
+    // Config keys
+    public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in memory");
+    public static final String CONFIG_DEV_CONSOLE_MAX_LOGS = registerConfig("dev_console_max_logs", "Max number of logs to retain in memory");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
-    private Integer maxEvents;
-    private String basePath;
-    private final int DEFAULT_MAX_EVENTS = 1000;
-    private final String DEFAULT_PATH = "/dev-console/ui";
-    private final String DEV_EVENTS_PATH = "/dev-console/events";
-    private final String DEV_INFO_PATH = "/dev-console/system-info";
+
+    // Constants
+    public static final String BASE_URL = "/dev-console";
+    public static final int DEFAULT_MAX_EVENTS = 1000;
+    public static final int DEFAULT_MAX_LOGS = 1000;
+    public static final String DEFAULT_UI_URL = "/ui";
+    public static final String DEV_EVENTS_URL = "/events";
+    public static final String DEV_INFO_URL = "/system-info";
+    public static final String DEV_LOGS_URL = "/logs";
+    public static final String DEV_CONFIG_URL = "/config";
+
+    public static Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
+    public static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
+    public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+
+    // Configurable fields
+    protected String basePath;
+    protected Integer maxEvents;
+    protected Integer maxLogs;
+
+    // Data structures
+    protected final Deque<Event<?, ?>> eventHistory = new ConcurrentLinkedDeque<>();
+    protected final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
+    protected final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
+    protected final AtomicInteger totalEvents = new AtomicInteger(0);
+    protected final ReentrantLock lock = new ReentrantLock();
+
 
     @Override
     public void start() {
-        context.info(() -> "[" + name() + "] started at " + basePath);
-        context.run(checkForNewChannelsAndSubscribe(), 0, 5, SECONDS);
+        try {
+            checkForNewChannelsAndSubscribe();
+            loadStaticFiles();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        context.subscribeEvent(EVENT_APP_HEARTBEAT, __ -> checkForNewChannelsAndSubscribe());
+        context.info(() -> "[{}] started at {} ", name(), BASE_URL + basePath);
     }
 
-    private ExRunnable checkForNewChannelsAndSubscribe() {
-        return () -> NanoBase.EVENT_TYPES.keySet().forEach(channelId -> {
-            if (subscribedChannels.add(channelId)) {
-                context.subscribeEvent(channelId, this::recordEvent);
+    @SuppressWarnings("ConstantConditions")
+    protected void checkForNewChannelsAndSubscribe() {
+        NanoBase.EVENT_CHANNELS.values().forEach(channel -> {
+            if (subscribedChannels.add(channel)) {
+                context.subscribeEvent(channel, this::recordEvent);
             }
         });
     }
 
+    @SuppressWarnings("unchecked")
+    protected void recordEvent(Event<?, ?> event) {
+        totalEvents.incrementAndGet();
+        // Exclude EVENT_APP_HEARTBEAT events from the list
+        if (event.channel().equals(EVENT_APP_HEARTBEAT))
+            return;
+        // Exclude Dev console Http events from the list
+        if (event.channel().equals(EVENT_HTTP_REQUEST) && event.payload() instanceof HttpObject payload) {
+            RoutesMatch route = match(payload);
+            if (!(route instanceof NoMatch)) {
+                handleHttpRequest((Event<HttpObject, HttpObject>) event, route);
+                return;
+            }
+        }
+
+        if (!event.channel().equals(EVENT_LOGGING)) {
+            if (eventHistory.size() >= maxEvents) {
+                removeLastNElements(eventHistory, eventHistory.size() - maxEvents + 1);
+            }
+            event.put("createdTs", Instant.now());
+            eventHistory.addFirst(event);
+        } else {
+            if (logHistory.size() >= maxLogs) {
+                removeLastNElements(logHistory, logHistory.size() - maxLogs + 1);
+            }
+            logHistory.addFirst(logFormatter.format((LogRecord) event.payload()));
+        }
+    }
+
+    // Add dev console routes below
+    protected RoutesMatch match(HttpObject request) {
+        if (request.pathMatch(BASE_URL + DEV_INFO_URL)) return new DevInfo();
+        if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) return new DevEvents();
+        if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
+        if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
+        if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
+        if (request.pathMatch(BASE_URL + "/{fileName}")) {
+            String fileName = request.pathParam("fileName");
+            if (STATIC_FILES.containsKey(fileName))
+                return new DevUi(fileName);
+        }
+        return new NoMatch();
+    }
+
+    protected void handleHttpRequest(final Event<HttpObject, HttpObject> event, final RoutesMatch route) {
+        switch (event.payload().methodType()) {
+            case GET -> handleGet(event, route);
+            case PATCH -> handlePatch(event, route);
+        }
+    }
+
+    protected void handleGet(Event<HttpObject, HttpObject> event, RoutesMatch route) {
+        switch (route) {
+            case DevInfo __ ->
+                event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
+            case DevEvents __ ->
+                event.respond(responseOk(event.payload(), getEventList(), ContentType.APPLICATION_JSON));
+            case DevLogs __ ->
+                event.respond(responseOk(event.payload(), toJson(new ArrayList<>(logHistory)), ContentType.APPLICATION_JSON));
+            case DevConfig __ -> event.respond(responseOk(event.payload(), getConfig(), ContentType.APPLICATION_JSON));
+            case DevHtml __ ->
+                event.respond(responseOk(event.payload(), STATIC_FILES.get("index.html"), ContentType.TEXT_HTML));
+            case DevUi fileRequest ->
+                event.respond(responseOk(event.payload(), STATIC_FILES.get(fileRequest.fileName()), getTypeFromFileExt(fileRequest.fileName())));
+            case NoMatch __ -> {}
+        }
+    }
+
+    protected void handlePatch(Event<HttpObject, HttpObject> event, RoutesMatch route) {
+        if (route instanceof DevConfig) {
+            event.respond(responseOk(event.payload(), updateConfig(event.payload().bodyAsJson()), event.payload().contentType()));
+        }
+    }
+
+    protected String updateConfig(TypeInfo<?> request) {
+        Map<String, Object> configChangeMap = new HashMap<>();
+        if (request.isPresent("maxEvents")) {
+            configChangeMap.put(CONFIG_DEV_CONSOLE_MAX_EVENTS, request.asInt("maxEvents"));
+        }
+        if (request.isPresent("maxLogs")) {
+            configChangeMap.put(CONFIG_DEV_CONSOLE_MAX_LOGS, request.asInt("maxLogs"));
+        }
+        if (request.isPresent("baseUrl")) {
+            configChangeMap.put(CONFIG_DEV_CONSOLE_URL, request.asString("baseUrl"));
+        }
+        context.newEvent(EVENT_CONFIG_CHANGE, () -> configChangeMap).broadcast(true).async(true).send();
+        return toJson(configChangeMap);
+    }
+
+    protected String getConfig() {
+        return toJson(Map.of(
+            "baseUrl", basePath,
+            "maxEvents", maxEvents,
+            "maxLogs", maxLogs));
+    }
+
+    public String getEventList() {
+        TypeList eventsList = new TypeList();
+        for (Event<?, ?> e : new ArrayList<>(eventHistory)) {
+            LinkedTypeMap eventMap = new LinkedTypeMap()
+                .putR("channel", e.channel().name())
+                .putR("isAck", e.isAcknowledged())
+                .putR("isBroadcast", e.isBroadcast())
+                .putR("eventTimestamp", e.get("createdTs"))
+                .putR("payload", e.payload() != null ? (String.valueOf(e.payload()).length() > 256 ? String.valueOf(e.payload()).substring(0, 256) + "…" : String.valueOf(e.payload())) : "")
+                .putR("response", e.response() != null ? (String.valueOf(e.response()).length() > 256 ? String.valueOf(e.response()).substring(0, 256) + "…" : String.valueOf(e.response())) : "");
+            eventsList.add(eventMap);
+        }
+        return eventsList.toJson();
+    }
+
+    public LinkedTypeMap getSystemInfo() {
+        return new LinkedTypeMap()
+            .putR("pid", context.nano().pid())
+            .putR("usedMemory", context.nano().usedMemoryMB() + " MB")
+            .putR("services", context.services().size())
+            .putR("serviceNames", context.services().stream().map(Service::name).toList())
+            .putR("schedulers", context.nano().schedulers().size())
+            .putR("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum())
+            .putR("heapUsage", context.nano().heapMemoryUsage())
+            .putR("os", System.getProperty("os.name") + " - " + System.getProperty("os.version"))
+            .putR("arch", System.getProperty("os.arch"))
+            .putR("java", System.getProperty("java.version"))
+            .putR("cores", Runtime.getRuntime().availableProcessors())
+            .putR("cpuUsage", BigDecimal.valueOf(osBean.getProcessCpuLoad() * 100.0).setScale(2, RoundingMode.HALF_UP).doubleValue())
+            .putR("threadsNano", NanoThread.activeNanoThreads())
+            .putR("threadsActive", NanoThread.activeCarrierThreads())
+            .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
+            .putR("totalEvents", totalEvents.get())
+            .putR("lastLogsRetained", logHistory.size())
+            .putR("lastEventsRetained", eventHistory.size())
+            .putR("lastUpdated", dateTimeFormatter.format(Instant.now()));
+    }
+
     @Override
-    public void stop() {
-        context.info(() -> "[" + name() + "] stopped.");
+    public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
+        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
+        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
+        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
+
+        if (maxEvents < eventHistory.size()) {
+            removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
+        }
+        if (maxLogs < logHistory.size()) {
+            removeLastNElements(logHistory, logHistory.size() - maxLogs);
+        }
     }
 
     @Override
@@ -66,117 +260,19 @@ public class DevConsoleService extends Service {
         return null;
     }
 
-    private void recordEvent(Event event) {
-        if(event.channelId() == EVENT_APP_HEARTBEAT)
-            return;
-        if (eventHistory.size() >= maxEvents) {
-            eventHistory.removeLast();
-        }
-        eventHistory.addFirst(EventWrapper.builder()
-            .event(event)
-            .timestamp(Instant.now())
-            //   .sourceService(event.asString("source")) TODO: Get event source
-            .build());
+    @Override
+    public void stop() {
+        context.info(() -> "[{}] stopped.", name());
     }
 
     @Override
-    public void onEvent(Event event) {
-        event.payloadOpt(HttpObject.class).ifPresent(request -> {
-            if (request.pathMatch(DEV_INFO_PATH)) {
-                event.acknowledge();
-                String systemInfoJson = JsonEncoder.toJson(getSystemInfo()); // formatToJson(getSystemInfo());
-                request.response()
-                        .statusCode(200)
-                        .header("Content-Type", "application/json")
-                        .body(systemInfoJson)
-                        .respond(event);
-                return;
-            }
+    public void onEvent(Event<?, ?> event) {}
 
-            if (request.pathMatch(DEV_EVENTS_PATH)) {
-                event.acknowledge();
-                String eventsJson = JsonEncoder.toJson(getEventList());
-                request.response()
-                        .statusCode(200)
-                        .header("Content-Type", "application/json")
-                        .body(eventsJson)
-                        .respond(event);
-                return;
-            }
-            if (request.pathMatch(basePath)) {
-                event.acknowledge();
-                try (InputStream in = getClass().getClassLoader().getResourceAsStream("index.html")) {
-                    if (in == null) {
-                        request.response().statusCode(404).body("UI not found").respond(event);
-                        return;
-                    }
-
-                    String html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
-
-                    request.response()
-                            .statusCode(200)
-                            .header("Content-Type", "text/html")
-                            .body(html)
-                            .respond(event);
-
-                } catch (IOException e) {
-                    request.response().statusCode(500).body("Error loading UI").respond(event);
-                }
-            }
-        });
-    }
-
-    @Override
-    public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
-        this.maxEvents = merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS);
-        this.basePath  = merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElseGet(() -> DEFAULT_PATH);
-    }
-
-    private List<Map<String, Object>> getEventList() {
-        List<Map<String, Object>> eventList = new ArrayList<>();
-        for (EventWrapper e : eventHistory) {
-            eventList.add(Map.of(
-                    "channel", Objects.toString(e.getEvent() != null ? e.getEvent().channel() : "UNKNOWN"),
-                    "isAck", e.getEvent() != null && e.getEvent().isAcknowledged(),
-                    "eventTimestamp", Objects.toString(e.getTimestamp(), Instant.EPOCH.toString()),
-                    "devEventId", Objects.toString(e.getEvent() != null ? e.getEvent().asUUID() : "N/A"),
-                    "parentChannel", Objects.toString(
-                            NanoBase.EVENT_TYPES.get(e.getEvent() != null ? e.getEvent().channelIdOrg() : null),
-                            "UNKNOWN"
-                    ),
-                    "payload", e.getEvent() != null
-                            ? e.getEvent().payloadOpt(Object.class).orElse("NONE")
-                            : "NONE"
-            ));
+    public void removeLastNElements(Deque<?> deque, final int N) {
+        lock.lock();
+        for (int i = 0; i < N; i++) {
+            deque.removeLast();
         }
-        return eventList;
-    }
-
-    private Map<String, Object> getSystemInfo() {
-        final long allThreads = NanoThread.activeCarrierThreads();
-        final Map<String, Object> info = Map.ofEntries(
-                Map.entry("pid", context.nano().pid()),
-                Map.entry("usedMemory", context.nano().usedMemoryMB() + " MB"),
-                Map.entry("services", context.services().size()),
-                Map.entry("serviceNames", context.services().stream().map(Service::name).toList()),
-                Map.entry("schedulers", context.nano().schedulers().size()),
-                Map.entry("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum()),
-                Map.entry("heapMemory", context.nano().heapMemoryUsage()),
-                Map.entry("os", System.getProperty("os.name") + " - " + System.getProperty("os.version")),
-                Map.entry("arch", System.getProperty("os.arch")),
-                Map.entry("java", System.getProperty("java.version")),
-                Map.entry("cores", Runtime.getRuntime().availableProcessors()),
-                Map.entry("threadsNano", NanoThread.activeNanoThreads()),
-                Map.entry("threadsActive", NanoThread.activeCarrierThreads()),
-                Map.entry("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads()),
-                Map.entry("host", context.nano().hostname()),
-                Map.entry("timestamp", Instant.now().toString())
-        );
-        return info;
-    }
-
-    public List<EventWrapper> getEventHistory() {
-        // send a copy of the LinkedList to be used by external services
-        return new ArrayList<>(eventHistory);
+        lock.unlock();
     }
 }

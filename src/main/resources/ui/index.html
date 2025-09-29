@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <title>Dev Console</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="light">
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden">
+    <symbol id="icon-terminal" viewBox="0 0 24 24">
+        <rect x="3" y="4" width="18" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="2"/>
+        <path d="M7 9l3 3-3 3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+              stroke-linejoin="round"/>
+        <path d="M12 15h5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </symbol>
+    <symbol id="icon-alert" viewBox="0 0 24 24">
+        <path d="M12 3l9 16H3L12 3z" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M12 10v4" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+        <circle cx="12" cy="17" r="1" fill="currentColor"/>
+    </symbol>
+</svg>
+<!-- Toolbar -->
+<div id="nanoToolbar" class="toolbar">
+    <div class="left">🚀 Nano</div>
+    <div class="right">
+        <!-- Hamburger trigger -->
+        <button id="toolbarMenuBtn" class="btn small menu-trigger" aria-haspopup="true" aria-expanded="false"
+                title="Menu">
+            <svg class="hamb" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h16"
+                      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+        </button>
+
+        <!-- Dropdown menu -->
+        <div id="toolbarMenu" class="menu" role="menu" aria-labelledby="toolbarMenuBtn">
+            <button id="nanoPauseBtn" class="menu-item" role="menuitem" title="Pause/Resume">⏸ Pause / Resume</button>
+            <button id="nanoExportBtn" class="menu-item" role="menuitem" title="Export events & logs">⬇️ Export</button>
+            <button id="nanoThemeBtn" class="menu-item" role="menuitem" title="Toggle theme">🌿 Toggle theme</button>
+        </div>
+    </div>
+</div>
+
+<h1 class="title-head">
+    <svg class="icon" role="img" aria-label="Developer Console">
+        <use href="#icon-terminal"></use>
+    </svg>
+    Developer Console
+</h1>
+
+<h2>📊 Real-time Metrics</h2>
+<div class="charts-grid">
+    <div class="chart-container">
+        <canvas id="memoryChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="heapChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="cpuChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="threadsChart" width="300" height="200"></canvas>
+    </div>
+    <div class="chart-container">
+        <canvas id="eventsChart" width="300" height="200"></canvas>
+    </div>
+</div>
+
+<h2>💻 System Info</h2>
+<pre id="system"></pre>
+
+<div class="tabs">
+    <div class="tab active" data-tab="events">📡 Events</div>
+    <div class="tab" data-tab="logs">📝 Logs</div>
+    <div class="tab" data-tab="config">⚙️ Config</div>
+</div>
+
+<div id="events" class="tab-content active">
+    <pre id="eventsData" class="log-view"></pre>
+</div>
+<div id="logs" class="tab-content">
+    <pre id="logsData" class="log-view"></pre>
+</div>
+<div id="config" class="tab-content">
+    <form id="configForm" class="config-form" novalidate>
+        <div class="field">
+            <label for="cfgMaxEvents">Max Events to be retained</label>
+            <input id="cfgMaxEvents" name="maxEvents" type="number" min="0" step="1"/>
+        </div>
+        <div class="field">
+            <label for="cfgMaxLogs">Max Logs to be retained</label>
+            <input id="cfgMaxLogs" name="maxLogs" type="number" min="0" step="1"/>
+        </div>
+        <div class="field">
+            <label for="cfgBaseUrl">Base URL</label>
+            <input id="cfgBaseUrl" name="baseUrl" type="text" inputmode="url"/>
+        </div>
+        <div class="actions">
+            <button id="configUpdateBtn" class="btn small" disabled>Update</button>
+        </div>
+    </form>
+    <div id="configToast" class="toast" role="status" aria-live="polite"></div>
+</div>
+
+<script src="charts.js"></script>
+<script src="script.js"></script>
+</body>
+</html>

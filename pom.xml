@@ -12,21 +12,72 @@
     <name>Dev Console for Nano</name>
     <description>Developer Console as a Nano service.</description>
 
+    <properties>
+        <nano-version>2025.1.4</nano-version>
+        <java-version>21</java-version>
+        <project.encoding>UTF-8</project.encoding>
+        <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+        <maven-editor-plugin-version>0.1.3</maven-editor-plugin-version>
+        <maven-ant-plugin-version>3.1.0</maven-ant-plugin-version>
+        <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>${project.encoding}</project.reporting.outputEncoding>
+
+        <!-- TEST -->
+        <junit.version>5.13.4</junit.version>
+        <assertj-core.version>3.27.6</assertj-core.version>
+        <junit-launcher.version>1.13.4</junit-launcher.version>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.nanonative</groupId>
             <artifactId>nano</artifactId>
-            <version>2025.0.15</version>
+            <version>${nano-version}</version>
             <scope>provided</scope>
+        </dependency>
+        <!-- TEST -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-api</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+            <version>${junit-launcher.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <version>${assertj-core.version}</version>
+            <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+            </resource>
+            <resource>
+                <directory>${project.build.directory}/generated-resources</directory>
+                <filtering>false</filtering>
+            </resource>
+        </resources>
+
         <plugins>
             <plugin>
                 <groupId>org.ec4j.maven</groupId>
                 <artifactId>editorconfig-maven-plugin</artifactId>
-                <version>0.1.3</version>
+                <version>${maven-editor-plugin-version}</version>
                 <executions>
                     <execution>
                         <goals>
@@ -38,16 +89,55 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.11.0</version>
+                <version>${maven-compiler-plugin.version}</version>
                 <configuration>
-                    <release>22</release>
+                    <source>${java-version}</source>
+                    <target>${java-version}</target>
+                    <release>${java-version}</release>
                 </configuration>
             </plugin>
+
+            <!-- Generate ui-files.txt (filenames from src/main/resources/ui) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>${maven-ant-plugin-version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-ui-files-list</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/generated-resources/ui"/>
+
+                                <path id="ui.path">
+                                    <fileset dir="${project.basedir}/src/main/resources/ui">
+                                        <include name="*"/>
+                                    </fileset>
+                                </path>
+                                <pathconvert property="ui.files.list" refid="ui.path" pathsep="${line.separator}">
+                                    <mapper type="flatten"/>
+                                </pathconvert>
+                                <echo file="${project.build.directory}/generated-resources/ui/ui-files.txt"
+                                      encoding="UTF-8">${ui.files.list}
+                                </echo>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <!-- Uncomment the below plugin to run the Main in this project -->
+            <!-- plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>org.nanonative.ab.devconsole.Main</mainClass>
+                </configuration>
+            </plugin -->
         </plugins>
     </build>
-
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
-    </properties>
 </project>
