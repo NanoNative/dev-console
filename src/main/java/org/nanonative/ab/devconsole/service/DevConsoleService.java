@@ -143,7 +143,11 @@ public class DevConsoleService extends Service {
         if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
         if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
-        if (request.pathMatch(BASE_URL + "/{fileName}")) return new DevUi(request.pathParam("fileName"));
+        if (request.pathMatch(BASE_URL + "/{fileName}")) {
+            String fileName = request.pathParam("fileName");
+            if (STATIC_FILES.containsKey(fileName))
+                return new DevUi(fileName);
+        }
         return new NoMatch();
     }
 
