@@ -9,6 +9,11 @@ on:
 
 jobs:
     builld:
+        permissions:
+            contents: write
+            deployments: write
+            packages: write
+            id-token: write
         uses: ./.github/workflows/java_build.yml
         with:
             ref: ${{ github.ref_name }}

@@ -22,6 +22,11 @@ on:
             - '.gradle/**'
 jobs:
     builld:
+        permissions:
+            contents: write
+            deployments: write
+            packages: write
+            id-token: write
         if: github.event.pull_request.merged == true
         uses: ./.github/workflows/java_build.yml
         with:
