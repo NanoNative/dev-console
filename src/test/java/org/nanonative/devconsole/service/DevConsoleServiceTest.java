@@ -20,6 +20,7 @@ import static org.nanonative.devconsole.service.DevConsoleService.DEV_EVENTS_URL
 import static org.nanonative.devconsole.service.DevConsoleService.DEV_INFO_URL;
 import static org.nanonative.devconsole.service.DevConsoleService.DEV_LOGS_URL;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.nanonative.devconsole.service.DevConsoleService.DEV_SERVICE_URL;
 import static org.nanonative.devconsole.util.UiHelper.STATIC_FILES;
 
 class DevConsoleServiceTest {
@@ -128,5 +129,31 @@ class DevConsoleServiceTest {
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
         assertThat(STATIC_FILES.size()).isEqualTo(4);
         assertThat(result.bodyAsString()).contains("<!DOCTYPE html>");
+    }
+
+    @Test
+    void serviceDeregisterTest() {
+        final Nano nano = new Nano(new HttpServer(), new DevConsoleService(), new HttpClient());
+        final HttpObject beforeTestResult = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(beforeTestResult.statusCode()).isEqualTo(200);
+        assertThat(beforeTestResult.hasContentType(ContentType.APPLICATION_JSON));
+        assertThat(beforeTestResult.bodyAsJson()).hasFieldOrPropertyWithValue("services", 4L);
+
+        final HttpObject deregisterResult = new HttpObject()
+            .methodType(HttpMethod.DELETE)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/0")
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(deregisterResult.statusCode()).isEqualTo(200);
+
+        final HttpObject afterTestResult = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(afterTestResult.statusCode()).isEqualTo(200);
+        assertThat(afterTestResult.hasContentType(ContentType.APPLICATION_JSON));
+        assertThat(afterTestResult.bodyAsJson()).hasFieldOrPropertyWithValue("services", 3L);
     }
 }

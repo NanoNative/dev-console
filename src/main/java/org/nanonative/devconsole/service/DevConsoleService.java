@@ -10,12 +10,14 @@ import org.nanonative.devconsole.util.DevEvents;
 import org.nanonative.devconsole.util.DevHtml;
 import org.nanonative.devconsole.util.DevInfo;
 import org.nanonative.devconsole.util.DevLogs;
+import org.nanonative.devconsole.util.DevService;
 import org.nanonative.devconsole.util.DevUi;
 import org.nanonative.devconsole.util.NoMatch;
 import org.nanonative.devconsole.util.RoutesMatch;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
+import org.nanonative.nano.helper.event.model.Channel;
 import org.nanonative.nano.helper.event.model.Event;
 import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;
@@ -32,13 +34,14 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
 
-import berlin.yuna.typemap.model.ConcurrentTypeSet;
 import org.nanonative.nano.services.logging.LogFormatRegister;
 
 import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
@@ -47,6 +50,7 @@ import static org.nanonative.devconsole.util.ResponseHelper.responseOk;
 import static org.nanonative.devconsole.util.UiHelper.STATIC_FILES;
 import static org.nanonative.devconsole.util.UiHelper.loadStaticFiles;
 import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
+import static org.nanonative.nano.core.model.Context.EVENT_APP_SERVICE_UNREGISTER;
 import static org.nanonative.nano.core.model.Context.EVENT_CONFIG_CHANGE;
 import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
 import static org.nanonative.nano.services.http.HttpServer.EVENT_HTTP_REQUEST;
@@ -68,6 +72,7 @@ public class DevConsoleService extends Service {
     public static final String DEV_INFO_URL = "/system-info";
     public static final String DEV_LOGS_URL = "/logs";
     public static final String DEV_CONFIG_URL = "/config";
+    public static final String DEV_SERVICE_URL = "/service";
 
     public static Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
     public static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
@@ -79,9 +84,10 @@ public class DevConsoleService extends Service {
     protected Integer maxLogs;
 
     // Data structures
+    protected Consumer<Event<Void, Void>> channelListener;
+    protected final Map<Channel<?, ?>, Consumer<? extends Event<?, ?>>> eventListenerMap = new ConcurrentHashMap<>();
     protected final Deque<Event<?, ?>> eventHistory = new ConcurrentLinkedDeque<>();
     protected final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
-    protected final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
     protected final AtomicInteger totalEvents = new AtomicInteger(0);
     protected final ReentrantLock lock = new ReentrantLock();
 
@@ -94,15 +100,15 @@ public class DevConsoleService extends Service {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
-        context.subscribeEvent(EVENT_APP_HEARTBEAT, __ -> checkForNewChannelsAndSubscribe());
+        channelListener = context.subscribeEvent(EVENT_APP_HEARTBEAT, (ev, __) -> checkForNewChannelsAndSubscribe());
         context.info(() -> "[{}] started at {} ", name(), BASE_URL + basePath);
     }
 
-    @SuppressWarnings("ConstantConditions")
     protected void checkForNewChannelsAndSubscribe() {
         NanoBase.EVENT_CHANNELS.values().forEach(channel -> {
-            if (subscribedChannels.add(channel)) {
-                context.subscribeEvent(channel, this::recordEvent);
+            if (!eventListenerMap.containsKey(channel)) {
+                final Consumer<? extends Event<?, ?>> listener = context.subscribeEvent(channel, (ev, __) -> recordEvent(ev));
+                eventListenerMap.put(channel, listener);
             }
         });
     }
@@ -142,6 +148,12 @@ public class DevConsoleService extends Service {
         if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) return new DevEvents();
         if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
+        if (request.pathMatch(BASE_URL + DEV_SERVICE_URL + "/{serviceIndex}")) {
+            final int idx = Integer.parseInt(request.pathParam("serviceIndex"));
+            if (idx < context.services().size()) {
+                return new DevService(idx);
+            }
+        }
         if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
         if (request.pathMatch(BASE_URL + "/{fileName}")) {
             String fileName = request.pathParam("fileName");
@@ -155,6 +167,7 @@ public class DevConsoleService extends Service {
         switch (event.payload().methodType()) {
             case GET -> handleGet(event, route);
             case PATCH -> handlePatch(event, route);
+            case DELETE -> handleDelete(event, route);
         }
     }
 
@@ -172,12 +185,21 @@ public class DevConsoleService extends Service {
             case DevUi fileRequest ->
                 event.respond(responseOk(event.payload(), STATIC_FILES.get(fileRequest.fileName()), getTypeFromFileExt(fileRequest.fileName())));
             case NoMatch __ -> {}
+            default -> context.info(() -> "The HttpMethod for this endpoint is incorrect");
         }
     }
 
     protected void handlePatch(Event<HttpObject, HttpObject> event, RoutesMatch route) {
         if (route instanceof DevConfig) {
             event.respond(responseOk(event.payload(), updateConfig(event.payload().bodyAsJson()), event.payload().contentType()));
+        }
+    }
+
+    protected void handleDelete(Event<HttpObject, HttpObject> event, RoutesMatch route) {
+        if (route instanceof DevService) {
+            Service service = context.services().get(((DevService) route).index());
+            context.newEvent(EVENT_APP_SERVICE_UNREGISTER, () -> service).async(true).send();
+            event.respond(responseOk(event.payload(), "", event.payload().contentType()));
         }
     }
 
@@ -262,7 +284,10 @@ public class DevConsoleService extends Service {
 
     @Override
     public void stop() {
-        context.info(() -> "[{}] stopped.", name());
+        context.unsubscribeEvent(EVENT_APP_HEARTBEAT, channelListener);
+        eventListenerMap.forEach((ch, listener) -> context.unsubscribeEvent(ch, (Consumer) listener));
+        this.eventHistory.clear();
+        this.logHistory.clear();
     }
 
     @Override
