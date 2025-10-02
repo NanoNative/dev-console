@@ -1,5 +1,6 @@
 package org.nanonative.devconsole.service;
 
+import berlin.yuna.typemap.model.TypeInfo;
 import org.junit.jupiter.api.Test;
 import org.nanonative.nano.core.Nano;
 import org.nanonative.nano.services.http.HttpClient;
@@ -8,6 +9,7 @@ import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpMethod;
 import org.nanonative.nano.services.http.model.HttpObject;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.nanonative.devconsole.service.DevConsoleService.BASE_URL;
@@ -133,27 +135,31 @@ class DevConsoleServiceTest {
 
     @Test
     void serviceDeregisterTest() {
-        final Nano nano = new Nano(new HttpServer(), new DevConsoleService(), new HttpClient());
+        DevConsoleService devConsole = new DevConsoleService();
+        final Nano nano = new Nano(new HttpServer(), devConsole, new HttpClient());
         final HttpObject beforeTestResult = new HttpObject()
             .methodType(HttpMethod.GET)
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(beforeTestResult.statusCode()).isEqualTo(200);
         assertThat(beforeTestResult.hasContentType(ContentType.APPLICATION_JSON));
-        assertThat(beforeTestResult.bodyAsJson()).hasFieldOrPropertyWithValue("services", 4L);
+        final TypeInfo<?> responseBody = beforeTestResult.bodyAsJson();
+        final long serviceCountBefore = nano.services().size() - devConsole.excludedServices.size();
+        assertThat(responseBody).hasFieldOrPropertyWithValue("services", serviceCountBefore);
+        final int serviceIdx = responseBody.get(List.class, "serviceNames").indexOf("DevConsoleService");
 
         final HttpObject deregisterResult = new HttpObject()
             .methodType(HttpMethod.DELETE)
-            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/0")
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/" + serviceIdx)
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
+        final long serviceCountAfter = nano.services().size() - devConsole.excludedServices.size();
+        assertThat(serviceCountAfter).isEqualTo(serviceCountBefore - 1);
 
         final HttpObject afterTestResult = new HttpObject()
             .methodType(HttpMethod.GET)
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
             .send(nano.context(DevConsoleServiceTest.class));
-        assertThat(afterTestResult.statusCode()).isEqualTo(200);
-        assertThat(afterTestResult.hasContentType(ContentType.APPLICATION_JSON));
-        assertThat(afterTestResult.bodyAsJson()).hasFieldOrPropertyWithValue("services", 3L);
+        assertThat(afterTestResult.statusCode()).isEqualTo(404);
     }
 }

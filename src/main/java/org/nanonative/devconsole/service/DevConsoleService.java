@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
@@ -74,7 +75,7 @@ public class DevConsoleService extends Service {
     public static final String DEV_CONFIG_URL = "/config";
     public static final String DEV_SERVICE_URL = "/service";
 
-    public static Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
+    public static final Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
     public static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
@@ -90,6 +91,9 @@ public class DevConsoleService extends Service {
     protected final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
     protected final AtomicInteger totalEvents = new AtomicInteger(0);
     protected final ReentrantLock lock = new ReentrantLock();
+
+    // Exclude internal services which does not get affected on stop like LogService
+    protected final List<String> excludedServices = List.of("LogService");
 
 
     @Override
@@ -150,7 +154,7 @@ public class DevConsoleService extends Service {
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
         if (request.pathMatch(BASE_URL + DEV_SERVICE_URL + "/{serviceIndex}")) {
             final int idx = Integer.parseInt(request.pathParam("serviceIndex"));
-            if (idx < context.services().size()) {
+            if (idx < getFilteredServices().size()) {
                 return new DevService(idx);
             }
         }
@@ -197,7 +201,8 @@ public class DevConsoleService extends Service {
 
     protected void handleDelete(Event<HttpObject, HttpObject> event, RoutesMatch route) {
         if (route instanceof DevService) {
-            Service service = context.services().get(((DevService) route).index());
+            // Exclude LogService from list
+            Service service = getFilteredServices().get(((DevService) route).index());
             context.newEvent(EVENT_APP_SERVICE_UNREGISTER, () -> service).async(true).send();
             event.respond(responseOk(event.payload(), "", event.payload().contentType()));
         }
@@ -244,8 +249,8 @@ public class DevConsoleService extends Service {
         return new LinkedTypeMap()
             .putR("pid", context.nano().pid())
             .putR("usedMemory", context.nano().usedMemoryMB() + " MB")
-            .putR("services", context.services().size())
-            .putR("serviceNames", context.services().stream().map(Service::name).toList())
+            .putR("services", getFilteredServices().size())
+            .putR("serviceNames", getFilteredServices().stream().map(Service::name).toList())
             .putR("schedulers", context.nano().schedulers().size())
             .putR("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum())
             .putR("heapUsage", context.nano().heapMemoryUsage())
@@ -261,6 +266,10 @@ public class DevConsoleService extends Service {
             .putR("lastLogsRetained", logHistory.size())
             .putR("lastEventsRetained", eventHistory.size())
             .putR("lastUpdated", dateTimeFormatter.format(Instant.now()));
+    }
+
+    protected List<Service> getFilteredServices() {
+        return context.services().stream().filter(svc -> !excludedServices.contains(svc.name())).toList();
     }
 
     @Override
@@ -288,6 +297,7 @@ public class DevConsoleService extends Service {
         eventListenerMap.forEach((ch, listener) -> context.unsubscribeEvent(ch, (Consumer) listener));
         this.eventHistory.clear();
         this.logHistory.clear();
+        context.info(() -> "[{}] stopped", name());
     }
 
     @Override
