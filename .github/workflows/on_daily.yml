@@ -33,7 +33,7 @@ concurrency:
 jobs:
   update:
     name: "🔄 Update Dependencies"
-    uses: NanoNative/nano/.github/workflows/reusable_update.yml
+    uses: NanoNative/nano/.github/workflows/reusable_update.yml@main
     permissions:
       contents: write      # Read repository and push changes to main
       packages: write      # Deploy to GitHub Packages (if deploy_on_changes=true)

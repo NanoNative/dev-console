@@ -119,7 +119,7 @@ jobs:
     name: "Deploy Release"
     needs: [ check-conditions ]
     if: needs.check-conditions.outputs.should_deploy == 'true'
-    uses: NanoNative/nano/.github/workflows/reusable_deploy.yml
+    uses: NanoNative/nano/.github/workflows/reusable_deploy.yml@main
     permissions:
       contents: write      # Create releases and push version commits
       packages: write      # Deploy to GitHub Packages
