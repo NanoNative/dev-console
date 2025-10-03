@@ -201,7 +201,6 @@ public class DevConsoleService extends Service {
 
     protected void handleDelete(Event<HttpObject, HttpObject> event, RoutesMatch route) {
         if (route instanceof DevService) {
-            // Exclude LogService from list
             Service service = getFilteredServices().get(((DevService) route).index());
             context.newEvent(EVENT_APP_SERVICE_UNREGISTER, () -> service).async(true).send();
             event.respond(responseOk(event.payload(), "", event.payload().contentType()));
@@ -295,8 +294,9 @@ public class DevConsoleService extends Service {
     public void stop() {
         context.unsubscribeEvent(EVENT_APP_HEARTBEAT, channelListener);
         eventListenerMap.forEach((ch, listener) -> context.unsubscribeEvent(ch, (Consumer) listener));
-        this.eventHistory.clear();
-        this.logHistory.clear();
+        eventListenerMap.clear();
+        eventHistory.clear();
+        logHistory.clear();
         context.info(() -> "[{}] stopped", name());
     }
 
