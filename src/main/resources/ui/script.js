@@ -506,7 +506,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const { index, name } = pending;
     if (index == null) return;
 
-    const url = `/dev-console/service/${index}`;
+    const url = `/dev-console/service/${encodeURIComponent(name)}`;
 
     try {
       const res = await fetch(url, { method: 'DELETE' });

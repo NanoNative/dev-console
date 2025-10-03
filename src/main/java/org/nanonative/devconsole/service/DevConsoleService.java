@@ -35,6 +35,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -152,10 +153,10 @@ public class DevConsoleService extends Service {
         if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) return new DevEvents();
         if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
-        if (request.pathMatch(BASE_URL + DEV_SERVICE_URL + "/{serviceIndex}")) {
-            final int idx = Integer.parseInt(request.pathParam("serviceIndex"));
-            if (idx < getFilteredServices().size()) {
-                return new DevService(idx);
+        if (request.pathMatch(BASE_URL + DEV_SERVICE_URL + "/{serviceName}")) {
+            final String svcName = request.pathParam("serviceName");
+            if (getFilteredServices().stream().anyMatch(svc -> svc.name().equals(svcName))) {
+                return new DevService(svcName);
             }
         }
         if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
@@ -201,9 +202,11 @@ public class DevConsoleService extends Service {
 
     protected void handleDelete(Event<HttpObject, HttpObject> event, RoutesMatch route) {
         if (route instanceof DevService) {
-            Service service = getFilteredServices().get(((DevService) route).index());
-            context.newEvent(EVENT_APP_SERVICE_UNREGISTER, () -> service).async(true).send();
-            event.respond(responseOk(event.payload(), "", event.payload().contentType()));
+            Optional<Service> optService = getFilteredServices().stream().filter(svc -> svc.name().equals(((DevService) route).name())).findFirst();
+            if (optService.isPresent()) {
+                context.newEvent(EVENT_APP_SERVICE_UNREGISTER, optService::get).async(true).send();
+                event.respond(responseOk(event.payload(), "", event.payload().contentType()));
+            }
         }
     }
 

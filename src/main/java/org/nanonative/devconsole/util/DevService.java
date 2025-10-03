@@ -1,3 +1,3 @@
 package org.nanonative.devconsole.util;
 
-public record DevService(int index) implements RoutesMatch {}
+public record DevService(String name) implements RoutesMatch {}
