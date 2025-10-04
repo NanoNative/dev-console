@@ -113,22 +113,31 @@ jobs:
           # Print coverage details from jacoco report
           if [ -n "$jacoco_report" ] && [ -f "$jacoco_report" ]; then
             # Get the LAST LINE counter (totals)
-            line=$(awk '/<counter/ && /type="LINE"/ { last=$0 } END { if (last) print last }' "$jacoco_report")
-            if [ -n "$line" ]; then
-              cov=$(printf '%s\n' "$line" | sed -n 's/.*covered="\([0-9][0-9]*\)".*/\1/p')
-              miss=$(printf '%s\n' "$line" | sed -n 's/.*missed="\([0-9][0-9]*\)".*/\1/p')
-              cov=${cov:-0}
-              miss=${miss:-0}
-              total=$(( cov + miss ))
-              if [ "$total" -gt 0 ]; then
-                pc=$(awk -v c="$cov" -v t="$total" 'BEGIN{ printf "%.2f", (100.0*c)/t }')
+            line=$(
+              awk '{
+                s=$0
+                while (match(s, /<counter[^>]*type="LINE"[^>]*\/>/)) {
+                  last = substr(s, RSTART, RLENGTH)
+                  s = substr(s, RSTART + RLENGTH)
+                }
+              } END { 
+                if (last) print last 
+              }' "$jacoco_report")
+              if [ -n "$line" ]; then
+                cov=$(printf '%s\n' "$line" | sed -n 's/.*covered="\([0-9][0-9]*\)".*/\1/p')
+                miss=$(printf '%s\n' "$line" | sed -n 's/.*missed="\([0-9][0-9]*\)".*/\1/p')
+                cov=${cov:-0}
+                miss=${miss:-0}
+                total=$(( cov + miss ))
+                if [ "$total" -gt 0 ]; then
+                  pc=$(awk -v c="$cov" -v t="$total" 'BEGIN{ printf "%.2f", (100.0*c)/t }')
+                else
+                  pc=0.00
+                fi
+                echo "Total Coverage: ${pc}% (${cov}/${total} lines)"
               else
-                pc=0.00
+                echo "No LINE counter found in ${jacoco_report}."
               fi
-              echo "Total Coverage: ${pc}% (${cov}/${total} lines)"
-            else
-              echo "No LINE counter found in ${jacoco_report}."
-            fi
           else
             echo "No Jacoco XML report found."
           fi
