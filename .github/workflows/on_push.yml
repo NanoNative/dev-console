@@ -59,7 +59,7 @@ concurrency:
 jobs:
   test:
     name: "🧪 Test [${{ github.event_name == 'pull_request' && format('PR #{0}', github.event.pull_request.number) || github.ref_name }}]"
-    uses: NanoNative/nano/.github/workflows/reusable_build_test.yml@main
+    uses: ./.github/workflows/reusable_build_test.yml
     permissions:
       contents: read    # Read repository content for checkout
     with:
