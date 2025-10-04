@@ -10,7 +10,6 @@ import org.nanonative.nano.services.http.model.HttpMethod;
 import org.nanonative.nano.services.http.model.HttpObject;
 import org.nanonative.nano.services.metric.logic.MetricService;
 
-import java.util.List;
 import java.util.Map;
 
 import static org.nanonative.devconsole.service.DevConsoleService.BASE_URL;
@@ -83,7 +82,7 @@ class DevConsoleServiceTest {
     @Test
     void updateConfigTest() {
         final String newBaseUrl = "/tests";
-        final int newMaxLogs = 101;
+        final int newMaxLogs = 1;
         final DevConsoleService devConsoleService = new DevConsoleService();
         final Nano nano = new Nano(new HttpServer(), devConsoleService, new HttpClient());
         final String baseUrl = devConsoleService.basePath;
@@ -132,6 +131,32 @@ class DevConsoleServiceTest {
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
         assertThat(STATIC_FILES.size()).isEqualTo(4);
         assertThat(result.bodyAsString()).contains("<!DOCTYPE html>");
+    }
+
+    @Test
+    void fetchJsTest() {
+        final Nano nano = new Nano(new HttpServer(), new DevConsoleService(), new HttpClient());
+        final HttpObject result = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + "/script.js")
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(result.statusCode()).isEqualTo(200);
+        assertThat(result.hasContentType(ContentType.APPLICATION_JAVASCRIPT));
+        assertThat(STATIC_FILES.size()).isEqualTo(4);
+        assertThat(result.bodyAsString()).contains("document.addEventListener(\"DOMContentLoaded\"");
+    }
+
+    @Test
+    void fetchCssTest() {
+        final Nano nano = new Nano(new HttpServer(), new DevConsoleService(), new HttpClient());
+        final HttpObject result = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + "/style.css")
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(result.statusCode()).isEqualTo(200);
+        assertThat(result.hasContentType(ContentType.TEXT_CSS));
+        assertThat(STATIC_FILES.size()).isEqualTo(4);
+        assertThat(result.bodyAsString()).contains("background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);");
     }
 
     @Test
