@@ -6,7 +6,7 @@
 
     <groupId>org.nanonative</groupId>
     <artifactId>devconsole</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Dev Console for Nano</name>
@@ -32,7 +32,7 @@
     </licenses>
 
     <properties>
-        <nano-version>2025.1.5</nano-version>
+        <nano-version>2025.10.2750958</nano-version>
         <java-version>21</java-version>
         <project.encoding>UTF-8</project.encoding>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
@@ -40,6 +40,9 @@
         <maven-ant-plugin-version>3.1.0</maven-ant-plugin-version>
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${project.encoding}</project.reporting.outputEncoding>
+        <codegen-concrete-classes-maven-plugin.version>1.0.0</codegen-concrete-classes-maven-plugin.version>
+        <codegen-concrete-classes-maven-plugin.baseclass>org.nanonative.nano.core.model.Service</codegen-concrete-classes-maven-plugin.baseclass>
+        <codegen-concrete-classes-maven-plugin.outputDir>META-INF/io/github/absketches/plugin/services.properties</codegen-concrete-classes-maven-plugin.outputDir>
 
         <!-- TEST -->
         <junit.version>5.13.4</junit.version>
@@ -104,6 +107,26 @@
         </resources>
 
         <plugins>
+            <plugin>
+                <groupId>io.github.absketches</groupId>
+                <artifactId>codegen-concrete-classes-maven-plugin</artifactId>
+                <version>${codegen-concrete-classes-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>nano-service-index</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <baseClasses>${codegen-concrete-classes-maven-plugin.baseclass}</baseClasses>
+                            <outputDir>${codegen-concrete-classes-maven-plugin.outputDir}</outputDir>
+                            <usePrecompiledLists>false</usePrecompiledLists>
+                            <verbose>true</verbose>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.ec4j.maven</groupId>
                 <artifactId>editorconfig-maven-plugin</artifactId>
@@ -190,9 +213,6 @@
                         <include>**/*Test.java</include>
                         <include>**/*Tests.java</include>
                     </includes>
-                    <argLine>${argLine} --add-exports java.base/sun.security.x509=ALL-UNNAMED --add-opens
-                        java.base/sun.security.x509=ALL-UNNAMED
-                    </argLine>
                     <useModulePath>false</useModulePath>
                 </configuration>
                 <executions>
@@ -265,6 +285,15 @@
                     </execution>
                 </executions>
             </plugin>
+            <!-- Uncomment the below plugin to run the Main in this project -->
+            <!--plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <mainClass>org.nanonative.devconsole.Main</mainClass>
+                </configuration>
+            </plugin-->
         </plugins>
     </build>
 
@@ -315,15 +344,6 @@
                             <deploymentName>${project.groupId}:${project.artifactId}:${project.version}</deploymentName>
                         </configuration>
                     </plugin>
-                    <!-- Uncomment the below plugin to run the Main in this project -->
-                    <!-- plugin>
-                        <groupId>org.codehaus.mojo</groupId>
-                        <artifactId>exec-maven-plugin</artifactId>
-                        <version>3.2.0</version>
-                        <configuration>
-                            <mainClass>org.nanonative.devconsole.Main</mainClass>
-                        </configuration>
-                    </plugin-->
                 </plugins>
             </build>
         </profile>

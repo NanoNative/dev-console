@@ -513,3 +513,16 @@ body:not(.light) .modal-card {
 body:not(.light) .modal-header,
 body:not(.light) .modal-actions { border-color: #374151; }
 body:not(.light) .modal-body { color: #E5E7EB; }
+
+
+/* === Inactive Services — neutral chips (no highlight) === */
+#system .tag.inactive {
+  background: transparent;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+body:not(.light) #system .tag.inactive {
+  background: transparent;
+  border-color: #4B5563;
+  color: #cbd5e1;
+}
