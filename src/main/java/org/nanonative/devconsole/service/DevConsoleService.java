@@ -238,15 +238,18 @@ public class DevConsoleService extends Service {
     }
 
     protected void startService(final Event<HttpObject, HttpObject> event, final String name) {
-        if (null == svcFactory) {
+        if (getFilteredServices().stream().map(Service::name).anyMatch(svcName -> svcName.equals(name))) {
+            event.error(new RuntimeException("{} already running"));
+        } else if (null == svcFactory) {
             event.error(new RuntimeException("Service index does not exist"));
             context.error(() -> "This endpoint should not have been invoked - hacker alert");
-        }
-        ClassInfo info = svcFactory.getClassInfo(name);
-        if (null != info) {
-            Service service = svcFactory.newInstance(name, info.clazz());
-            context.newEvent(EVENT_APP_SERVICE_REGISTER, () -> service).broadcast(true).async(true).send();
-            event.respond(responseOk(event.payload(), "success:true", event.payload().contentType()));
+        } else {
+            ClassInfo info = svcFactory.getClassInfo(name);
+            if (null != info) {
+                Service service = svcFactory.newInstance(name, info.clazz());
+                context.newEvent(EVENT_APP_SERVICE_REGISTER, () -> service).broadcast(true).async(true).send();
+                event.respond(responseOk(event.payload(), "success:true", event.payload().contentType()));
+            }
         }
     }
 
@@ -256,6 +259,8 @@ public class DevConsoleService extends Service {
             if (optService.isPresent()) {
                 context.newEvent(EVENT_APP_SERVICE_UNREGISTER, optService::get).broadcast(true).async(true).send();
                 event.respond(responseOk(event.payload(), "", event.payload().contentType()));
+            } else {
+                event.error(new RuntimeException("{} not running"));
             }
         }
     }

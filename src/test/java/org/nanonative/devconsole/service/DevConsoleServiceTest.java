@@ -39,6 +39,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.APPLICATION_JSON));
         assertThat(result.bodyAsString()).contains("channel").contains("payload").contains("response");
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -51,6 +52,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.APPLICATION_JSON));
         assertThat(result.bodyAsString()).contains("pid").contains("totalEvents");
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -65,6 +67,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.APPLICATION_JSON));
         assertThat(result.bodyAsString()).contains(log);
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -77,6 +80,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.APPLICATION_JSON));
         assertThat(result.bodyAsString()).contains("maxEvents").contains("maxLogs").contains("baseUrl");
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -102,6 +106,7 @@ class DevConsoleServiceTest {
         assertThat(devConsoleService.basePath).isEqualTo(newBaseUrl);
         assertThat(devConsoleService.maxLogs).isEqualTo(newMaxLogs);
         assertThat(devConsoleService.maxEvents).isEqualTo(DEFAULT_MAX_EVENTS);
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -114,6 +119,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
         assertThat(result.bodyAsString()).contains("<!DOCTYPE html>");
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -130,6 +136,7 @@ class DevConsoleServiceTest {
         assertThat(result.hasContentType(ContentType.TEXT_HTML));
         assertThat(STATIC_FILES.size()).isEqualTo(5);
         assertThat(result.bodyAsString()).contains("<!DOCTYPE html>");
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -142,6 +149,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.APPLICATION_JAVASCRIPT));
         assertThat(result.bodyAsString()).contains("document.addEventListener(\"DOMContentLoaded\"");
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -154,6 +162,7 @@ class DevConsoleServiceTest {
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.TEXT_CSS));
         assertThat(result.bodyAsString()).contains("background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 50%, #cbd5e1 100%);");
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -183,6 +192,7 @@ class DevConsoleServiceTest {
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(afterTestResult.statusCode()).isEqualTo(404);
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
@@ -211,8 +221,65 @@ class DevConsoleServiceTest {
             .methodType(HttpMethod.DELETE)
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
             .send(nano.context(DevConsoleServiceTest.class));
-        assertThat(duplicateCallResult.statusCode()).isEqualTo(404);
+        assertThat(duplicateCallResult.statusCode()).isEqualTo(500);
         final long serviceCountAfterDuplicate = devConsole.getFilteredServices().size();
         assertThat(serviceCountAfterDuplicate).isEqualTo(serviceCountAfter);
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
+    }
+
+    @Test
+    void serviceRegisterSuccessTest() {
+        DevConsoleService devConsole = new DevConsoleService();
+        final Nano nano = new Nano(new HttpServer(), devConsole, new HttpClient());
+        final HttpObject beforeTestResult = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(beforeTestResult.statusCode()).isEqualTo(200);
+        assertThat(beforeTestResult.hasContentType(ContentType.APPLICATION_JSON));
+        final TypeInfo<?> responseBody = beforeTestResult.bodyAsJson();
+        final long serviceCountBefore = devConsole.getFilteredServices().size();
+        assertThat(responseBody).hasFieldOrPropertyWithValue("runningServices", serviceCountBefore);
+
+        final HttpObject deregisterResult = new HttpObject()
+            .methodType(HttpMethod.PATCH)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(deregisterResult.statusCode()).isEqualTo(200);
+        final long serviceCountAfter = devConsole.getFilteredServices().size();
+        assertThat(serviceCountAfter).isEqualTo(serviceCountBefore + 1);
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
+    }
+
+    @Test
+    void serviceRegisterFailureTest() {
+        DevConsoleService devConsole = new DevConsoleService();
+        final Nano nano = new Nano(new HttpServer(), devConsole, new HttpClient());
+        final HttpObject beforeTestResult = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(beforeTestResult.statusCode()).isEqualTo(200);
+        assertThat(beforeTestResult.hasContentType(ContentType.APPLICATION_JSON));
+        final TypeInfo<?> responseBody = beforeTestResult.bodyAsJson();
+        final long serviceCountBefore = devConsole.getFilteredServices().size();
+        assertThat(responseBody).hasFieldOrPropertyWithValue("runningServices", serviceCountBefore);
+
+        final HttpObject deregisterResult = new HttpObject()
+            .methodType(HttpMethod.PATCH)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(deregisterResult.statusCode()).isEqualTo(200);
+        final long serviceCountAfter = devConsole.getFilteredServices().size();
+        assertThat(serviceCountAfter).isEqualTo(serviceCountBefore + 1);
+
+        final HttpObject duplicateCallResult = new HttpObject()
+            .methodType(HttpMethod.PATCH)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(duplicateCallResult.statusCode()).isEqualTo(500);
+        final long serviceCountAfterDuplicate = devConsole.getFilteredServices().size();
+        assertThat(serviceCountAfterDuplicate).isEqualTo(serviceCountAfter);
+        assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 }
