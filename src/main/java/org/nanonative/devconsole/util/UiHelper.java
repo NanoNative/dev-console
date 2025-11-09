@@ -32,6 +32,8 @@ public class UiHelper {
         InputStream in = Objects.requireNonNull(
             DevConsoleService.class.getResourceAsStream(UI_BASE_DIR + "/" + fileName),
             fileName + " not found in resources");
-        return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        try (in) {
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }

@@ -6,14 +6,33 @@
 
     <groupId>org.nanonative</groupId>
     <artifactId>devconsole</artifactId>
-    <version>1.0.0</version>
+    <version>1.0.1-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Dev Console for Nano</name>
     <description>Developer Console as a Nano service.</description>
+    <url>https://github.com/nanonative/dev-console</url>
+
+    <scm>
+        <connection>scm:git:ssh://git@github.com/nanonative/dev-console.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/nanonative/dev-console.git</developerConnection>
+        <url>https://github.com/nanonative/dev-console.git</url>
+    </scm>
+    <developers>
+        <developer>
+            <name>Abhi Basu</name>
+            <email>basuabhi92@gmail.com</email>
+        </developer>
+    </developers>
+    <licenses>
+        <license>
+            <name>The Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+        </license>
+    </licenses>
 
     <properties>
-        <nano-version>2025.1.4</nano-version>
+        <nano-version>2025.10.2750958</nano-version>
         <java-version>21</java-version>
         <project.encoding>UTF-8</project.encoding>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
@@ -21,11 +40,25 @@
         <maven-ant-plugin-version>3.1.0</maven-ant-plugin-version>
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${project.encoding}</project.reporting.outputEncoding>
+        <codegen-concrete-classes-maven-plugin.version>1.0.0</codegen-concrete-classes-maven-plugin.version>
+        <codegen-concrete-classes-maven-plugin.baseclass>org.nanonative.nano.core.model.Service</codegen-concrete-classes-maven-plugin.baseclass>
+        <codegen-concrete-classes-maven-plugin.outputDir>META-INF/io/github/absketches/plugin/services.properties</codegen-concrete-classes-maven-plugin.outputDir>
 
         <!-- TEST -->
         <junit.version>5.13.4</junit.version>
         <assertj-core.version>3.27.6</assertj-core.version>
         <junit-launcher.version>1.13.4</junit-launcher.version>
+
+        <!-- TEST COVERAGE -->
+        <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
+        <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
+        <maven-failsafe-plugin.version>3.5.4</maven-failsafe-plugin.version>
+
+        <!-- PUBLISH -->
+        <maven-gpg-plugin.version>1.6</maven-gpg-plugin.version>
+        <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
+        <maven-javadoc-plugin.version>3.12.0</maven-javadoc-plugin.version>
+        <central-publishing-maven-plugin.version>0.9.0</central-publishing-maven-plugin.version>
     </properties>
 
     <dependencies>
@@ -75,6 +108,26 @@
 
         <plugins>
             <plugin>
+                <groupId>io.github.absketches</groupId>
+                <artifactId>codegen-concrete-classes-maven-plugin</artifactId>
+                <version>${codegen-concrete-classes-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>nano-service-index</id>
+                        <phase>process-classes</phase>
+                        <goals>
+                            <goal>generate</goal>
+                        </goals>
+                        <configuration>
+                            <baseClasses>${codegen-concrete-classes-maven-plugin.baseclass}</baseClasses>
+                            <outputDir>${codegen-concrete-classes-maven-plugin.outputDir}</outputDir>
+                            <usePrecompiledLists>false</usePrecompiledLists>
+                            <verbose>true</verbose>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.ec4j.maven</groupId>
                 <artifactId>editorconfig-maven-plugin</artifactId>
                 <version>${maven-editor-plugin-version}</version>
@@ -97,7 +150,110 @@
                 </configuration>
             </plugin>
 
-            <!-- Generate ui-files.txt (filenames from src/main/resources/ui) -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <version>${maven-source-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-javadoc-plugin</artifactId>
+                <version>${maven-javadoc-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>attach-javadocs</id>
+                        <goals>
+                            <goal>jar</goal>
+                        </goals>
+                        <configuration>
+                            <nodeprecatedlist>true</nodeprecatedlist>
+                            <quiet>true</quiet>
+                            <doclint>none</doclint>
+                            <failOnError>false</failOnError>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- override surefire defaults -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven-surefire-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>default-test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                        <configuration>
+                            <skipTests>true</skipTests>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Run integration tests -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>${maven-failsafe-plugin.version}</version>
+                <configuration>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                    </includes>
+                    <useModulePath>false</useModulePath>
+                </configuration>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- JaCoCo for ITs only -->
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>pre-integration-prepare</id>
+                        <goals>
+                            <goal>prepare-agent-integration</goal>
+                        </goals>
+                        <configuration>
+                            <destFile>${project.build.directory}/jacoco.exec</destFile>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>it-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report-integration</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- Generate ui-files.txt (existing) -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-antrun-plugin</artifactId>
@@ -130,14 +286,66 @@
                 </executions>
             </plugin>
             <!-- Uncomment the below plugin to run the Main in this project -->
-            <!-- plugin>
+            <!--plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <version>3.2.0</version>
                 <configuration>
                     <mainClass>org.nanonative.devconsole.Main</mainClass>
                 </configuration>
-            </plugin -->
+            </plugin-->
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <!-- mvn clean deploy -P release -->
+            <id>release</id>
+            <activation>
+                <property>
+                    <name>release</name>
+                    <value>true</value>
+                </property>
+                <activeByDefault>false</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <!-- Sign artifacts -->
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>${maven-gpg-plugin.version}</version>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                                <configuration>
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+
+                    <!-- Sonatype Central publishing -->
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>${central-publishing-maven-plugin.version}</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <autoPublish>true</autoPublish>
+                            <deploymentName>${project.groupId}:${project.artifactId}:${project.version}</deploymentName>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 </project>

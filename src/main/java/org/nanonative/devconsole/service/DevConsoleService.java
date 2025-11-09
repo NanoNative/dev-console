@@ -5,40 +5,56 @@ import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMapI;
 import com.sun.management.OperatingSystemMXBean;
+import org.nanonative.devconsole.util.ClassInfo;
 import org.nanonative.devconsole.util.DevConfig;
 import org.nanonative.devconsole.util.DevEvents;
 import org.nanonative.devconsole.util.DevHtml;
 import org.nanonative.devconsole.util.DevInfo;
 import org.nanonative.devconsole.util.DevLogs;
+import org.nanonative.devconsole.util.DevService;
 import org.nanonative.devconsole.util.DevUi;
 import org.nanonative.devconsole.util.NoMatch;
 import org.nanonative.devconsole.util.RoutesMatch;
+import org.nanonative.devconsole.util.ServiceFactory;
 import org.nanonative.nano.core.NanoBase;
 import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
+import org.nanonative.nano.helper.event.model.Channel;
 import org.nanonative.nano.helper.event.model.Event;
 import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URL;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Properties;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 import java.util.logging.Formatter;
 import java.util.logging.LogRecord;
+import java.util.stream.Collectors;
 
-import berlin.yuna.typemap.model.ConcurrentTypeSet;
 import org.nanonative.nano.services.logging.LogFormatRegister;
 
 import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
@@ -47,6 +63,8 @@ import static org.nanonative.devconsole.util.ResponseHelper.responseOk;
 import static org.nanonative.devconsole.util.UiHelper.STATIC_FILES;
 import static org.nanonative.devconsole.util.UiHelper.loadStaticFiles;
 import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
+import static org.nanonative.nano.core.model.Context.EVENT_APP_SERVICE_REGISTER;
+import static org.nanonative.nano.core.model.Context.EVENT_APP_SERVICE_UNREGISTER;
 import static org.nanonative.nano.core.model.Context.EVENT_CONFIG_CHANGE;
 import static org.nanonative.nano.helper.config.ConfigRegister.registerConfig;
 import static org.nanonative.nano.services.http.HttpServer.EVENT_HTTP_REQUEST;
@@ -68,8 +86,10 @@ public class DevConsoleService extends Service {
     public static final String DEV_INFO_URL = "/system-info";
     public static final String DEV_LOGS_URL = "/logs";
     public static final String DEV_CONFIG_URL = "/config";
+    public static final String DEV_SERVICE_URL = "/service";
+    public static final String SERVICES_PATH = "META-INF/io/github/absketches/plugin/services.properties";
 
-    public static Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
+    public static final Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
     public static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
@@ -79,36 +99,61 @@ public class DevConsoleService extends Service {
     protected Integer maxLogs;
 
     // Data structures
+    protected Consumer<Event<Void, Void>> channelListener;
+    protected final Map<Channel<?, ?>, Consumer<? extends Event<?, ?>>> eventListenerMap = new ConcurrentHashMap<>();
     protected final Deque<Event<?, ?>> eventHistory = new ConcurrentLinkedDeque<>();
     protected final Deque<String> logHistory = new ConcurrentLinkedDeque<>();
-    protected final ConcurrentTypeSet subscribedChannels = new ConcurrentTypeSet();
     protected final AtomicInteger totalEvents = new AtomicInteger(0);
     protected final ReentrantLock lock = new ReentrantLock();
+    protected ServiceFactory svcFactory;
+
+    // Exclude internal services which does not get affected on stop like LogService
+    protected final Set<String> excludedServices = Set.of("LogService", "FileWatcher", "HttpServer", "HttpClient");
+
+    // Populate this only once at startup - rest all read ops and not expected to run into concurrency issues
+    protected Set<String> servicesIndex = new LinkedHashSet<>();
 
 
     @Override
     public void start() {
+        checkForNewChannelsAndSubscribe();
+        populateServiceIndex();
         try {
-            checkForNewChannelsAndSubscribe();
             loadStaticFiles();
-        } catch (IOException e) {
+        } catch (Exception e) {
             throw new RuntimeException(e);
         }
-        context.subscribeEvent(EVENT_APP_HEARTBEAT, __ -> checkForNewChannelsAndSubscribe());
+        channelListener = context.subscribeEvent(EVENT_APP_HEARTBEAT, (ev, __) -> checkForNewChannelsAndSubscribe());
         context.info(() -> "[{}] started at {} ", name(), BASE_URL + basePath);
     }
 
-    @SuppressWarnings("ConstantConditions")
+    protected void populateServiceIndex() {
+        final ClassLoader cl = Thread.currentThread().getContextClassLoader();
+        final List<URL> urls;
+        try {
+            urls = Collections.list(cl.getResources(SERVICES_PATH));
+            if (!urls.isEmpty()) {
+                Set<String> serviceFqcnList = fetchCorrectPropFile(urls);
+                svcFactory = new ServiceFactory(new ArrayList<>(serviceFqcnList));
+                servicesIndex = serviceFqcnList.stream().map(ServiceFactory::getSimpleName).collect(Collectors.toSet());
+                servicesIndex.removeAll(excludedServices);
+            }
+        } catch (IOException ex) {
+            context.warn(() -> "loadServicesIfPresent::IO exception: {}", ex);
+        }
+    }
+
     protected void checkForNewChannelsAndSubscribe() {
         NanoBase.EVENT_CHANNELS.values().forEach(channel -> {
-            if (subscribedChannels.add(channel)) {
-                context.subscribeEvent(channel, this::recordEvent);
+            if (!eventListenerMap.containsKey(channel)) {
+                final Consumer<? extends Event<?, ?>> listener = context.subscribeEvent(channel, (ev, __) -> recordEvent(ev));
+                eventListenerMap.put(channel, listener);
             }
         });
     }
 
     @SuppressWarnings("unchecked")
-    protected void recordEvent(Event<?, ?> event) {
+    protected void recordEvent(final Event<?, ?> event) {
         totalEvents.incrementAndGet();
         // Exclude EVENT_APP_HEARTBEAT events from the list
         if (event.channel().equals(EVENT_APP_HEARTBEAT))
@@ -137,11 +182,17 @@ public class DevConsoleService extends Service {
     }
 
     // Add dev console routes below
-    protected RoutesMatch match(HttpObject request) {
+    protected RoutesMatch match(final HttpObject request) {
         if (request.pathMatch(BASE_URL + DEV_INFO_URL)) return new DevInfo();
         if (request.pathMatch(BASE_URL + DEV_EVENTS_URL)) return new DevEvents();
         if (request.pathMatch(BASE_URL + DEV_LOGS_URL)) return new DevLogs();
         if (request.pathMatch(BASE_URL + DEV_CONFIG_URL)) return new DevConfig();
+        if (request.pathMatch(BASE_URL + DEV_SERVICE_URL + "/{serviceName}")) {
+            final String svcName = request.pathParam("serviceName");
+            if (getFilteredServices().stream().anyMatch(rSvc -> rSvc.name().equals(svcName)) || servicesIndex.stream().anyMatch(svcName::equals)) {
+                return new DevService(svcName);
+            }
+        }
         if (request.pathMatch(BASE_URL + basePath)) return new DevHtml();
         if (request.pathMatch(BASE_URL + "/{fileName}")) {
             String fileName = request.pathParam("fileName");
@@ -155,10 +206,11 @@ public class DevConsoleService extends Service {
         switch (event.payload().methodType()) {
             case GET -> handleGet(event, route);
             case PATCH -> handlePatch(event, route);
+            case DELETE -> handleDelete(event, route);
         }
     }
 
-    protected void handleGet(Event<HttpObject, HttpObject> event, RoutesMatch route) {
+    protected void handleGet(final Event<HttpObject, HttpObject> event, final RoutesMatch route) {
         switch (route) {
             case DevInfo __ ->
                 event.respond(responseOk(event.payload(), toJson(getSystemInfo()), ContentType.APPLICATION_JSON));
@@ -172,16 +224,48 @@ public class DevConsoleService extends Service {
             case DevUi fileRequest ->
                 event.respond(responseOk(event.payload(), STATIC_FILES.get(fileRequest.fileName()), getTypeFromFileExt(fileRequest.fileName())));
             case NoMatch __ -> {}
+            default -> context.info(() -> "The HttpMethod for this endpoint is incorrect");
         }
     }
 
-    protected void handlePatch(Event<HttpObject, HttpObject> event, RoutesMatch route) {
-        if (route instanceof DevConfig) {
-            event.respond(responseOk(event.payload(), updateConfig(event.payload().bodyAsJson()), event.payload().contentType()));
+    protected void handlePatch(final Event<HttpObject, HttpObject> event, final RoutesMatch route) {
+        switch (route) {
+            case DevConfig __ ->
+                event.respond(responseOk(event.payload(), updateConfig(event.payload().bodyAsJson()), event.payload().contentType()));
+            case DevService devService -> startService(event, devService.name());
+            default -> {}
         }
     }
 
-    protected String updateConfig(TypeInfo<?> request) {
+    protected void startService(final Event<HttpObject, HttpObject> event, final String name) {
+        if (getFilteredServices().stream().map(Service::name).anyMatch(svcName -> svcName.equals(name))) {
+            event.error(new RuntimeException("{} already running"));
+        } else if (null == svcFactory) {
+            event.error(new RuntimeException("Service index does not exist"));
+            context.error(() -> "This endpoint should not have been invoked - hacker alert");
+        } else {
+            ClassInfo info = svcFactory.getClassInfo(name);
+            if (null != info) {
+                Service service = svcFactory.newInstance(name, info.clazz());
+                context.newEvent(EVENT_APP_SERVICE_REGISTER, () -> service).broadcast(true).async(true).send();
+                event.respond(responseOk(event.payload(), "success:true", event.payload().contentType()));
+            }
+        }
+    }
+
+    protected void handleDelete(final Event<HttpObject, HttpObject> event, final RoutesMatch route) {
+        if (route instanceof DevService) {
+            Optional<Service> optService = getFilteredServices().stream().filter(svc -> svc.name().equals(((DevService) route).name())).findFirst();
+            if (optService.isPresent()) {
+                context.newEvent(EVENT_APP_SERVICE_UNREGISTER, optService::get).broadcast(true).async(true).send();
+                event.respond(responseOk(event.payload(), "", event.payload().contentType()));
+            } else {
+                event.error(new RuntimeException("{} not running"));
+            }
+        }
+    }
+
+    protected String updateConfig(final TypeInfo<?> request) {
         Map<String, Object> configChangeMap = new HashMap<>();
         if (request.isPresent("maxEvents")) {
             configChangeMap.put(CONFIG_DEV_CONSOLE_MAX_EVENTS, request.asInt("maxEvents"));
@@ -204,7 +288,7 @@ public class DevConsoleService extends Service {
     }
 
     public String getEventList() {
-        TypeList eventsList = new TypeList();
+        final TypeList eventsList = new TypeList();
         for (Event<?, ?> e : new ArrayList<>(eventHistory)) {
             LinkedTypeMap eventMap = new LinkedTypeMap()
                 .putR("channel", e.channel().name())
@@ -219,11 +303,11 @@ public class DevConsoleService extends Service {
     }
 
     public LinkedTypeMap getSystemInfo() {
-        return new LinkedTypeMap()
+        final LinkedTypeMap systemInfo = new LinkedTypeMap()
             .putR("pid", context.nano().pid())
             .putR("usedMemory", context.nano().usedMemoryMB() + " MB")
-            .putR("services", context.services().size())
-            .putR("serviceNames", context.services().stream().map(Service::name).toList())
+            .putR("runningServices", getFilteredServices().size())
+            .putR("activeServices", getFilteredServices().stream().map(Service::name).toList())
             .putR("schedulers", context.nano().schedulers().size())
             .putR("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum())
             .putR("heapUsage", context.nano().heapMemoryUsage())
@@ -239,7 +323,27 @@ public class DevConsoleService extends Service {
             .putR("lastLogsRetained", logHistory.size())
             .putR("lastEventsRetained", eventHistory.size())
             .putR("lastUpdated", dateTimeFormatter.format(Instant.now()));
+
+        loadInactiveServices().ifPresent(services -> systemInfo.putR("inactiveServices", services));
+        return systemInfo;
     }
+
+    protected List<Service> getFilteredServices() {
+        return context.services().stream().filter(svc -> !excludedServices.contains(svc.name())).toList();
+    }
+
+    protected Optional<Set<String>> loadInactiveServices() {
+        if (servicesIndex.isEmpty()) {
+            return Optional.empty();
+        }
+
+        final Set<String> activeServices = getFilteredServices().stream().map(Service::name).collect(Collectors.toSet());
+        final Set<String> inactiveServices = new LinkedHashSet<>(servicesIndex);
+        inactiveServices.removeAll(activeServices);
+
+        return inactiveServices.isEmpty() ? Optional.empty() : Optional.of(inactiveServices);
+    }
+
 
     @Override
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
@@ -262,7 +366,12 @@ public class DevConsoleService extends Service {
 
     @Override
     public void stop() {
-        context.info(() -> "[{}] stopped.", name());
+        context.unsubscribeEvent(EVENT_APP_HEARTBEAT, channelListener);
+        eventListenerMap.forEach((ch, listener) -> context.unsubscribeEvent(ch, (Consumer) listener));
+        eventListenerMap.clear();
+        eventHistory.clear();
+        logHistory.clear();
+        context.info(() -> "[{}] stopped", name());
     }
 
     @Override
@@ -274,5 +383,39 @@ public class DevConsoleService extends Service {
             deque.removeLast();
         }
         lock.unlock();
+    }
+
+    private Set<String> fetchCorrectPropFile(List<URL> urls) {
+        String serviceFqcn = Service.class.getCanonicalName();
+        Set<String> services = new HashSet<>();
+        int svcCnt = 0;
+
+        for (URL url : urls) {
+            Properties p = new Properties();
+            try (InputStream in = url.openStream()) {
+                p.load(in);
+            } catch (IOException ex) {
+                // Skip unreadable files but continue
+                continue;
+            }
+
+            String nanoServiceImpl = p.getProperty(serviceFqcn);
+            if (null == nanoServiceImpl || nanoServiceImpl.isBlank()) {
+                continue;
+            }
+
+            Set<String> serviceNames = Arrays.stream(nanoServiceImpl.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+
+            int currCnt = serviceNames.size();
+
+            if (currCnt > svcCnt) {
+                services = serviceNames;
+                svcCnt = currCnt;
+            }
+        }
+        return services;
     }
 }
