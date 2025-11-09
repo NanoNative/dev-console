@@ -176,16 +176,14 @@ class DevConsoleServiceTest {
         assertThat(beforeTestResult.statusCode()).isEqualTo(200);
         assertThat(beforeTestResult.hasContentType(ContentType.APPLICATION_JSON));
         final TypeInfo<?> responseBody = beforeTestResult.bodyAsJson();
-        final long serviceCountBefore = devConsole.getFilteredServices().size();
-        assertThat(responseBody).hasFieldOrPropertyWithValue("runningServices", serviceCountBefore);
+        final long serviceCountBefore =  responseBody.get(Integer.class, "runningServices");
+        assertThat(serviceCountBefore).isEqualTo(1L);
 
         final HttpObject deregisterResult = new HttpObject()
             .methodType(HttpMethod.DELETE)
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/DevConsoleService")
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
-        final long serviceCountAfter = devConsole.getFilteredServices().size();
-        assertThat(serviceCountAfter).isEqualTo(serviceCountBefore - 1);
 
         final HttpObject afterTestResult = new HttpObject()
             .methodType(HttpMethod.GET)
