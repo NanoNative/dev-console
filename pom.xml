@@ -37,7 +37,7 @@
         <project.encoding>UTF-8</project.encoding>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
         <maven-editor-plugin-version>0.1.3</maven-editor-plugin-version>
-        <maven-ant-plugin-version>3.1.0</maven-ant-plugin-version>
+        <maven-ant-plugin-version>3.2.0</maven-ant-plugin-version>
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${project.encoding}</project.reporting.outputEncoding>
         <codegen-concrete-classes-maven-plugin.version>1.0.0</codegen-concrete-classes-maven-plugin.version>
@@ -45,13 +45,13 @@
         <codegen-concrete-classes-maven-plugin.outputDir>META-INF/io/github/absketches/plugin/services.properties</codegen-concrete-classes-maven-plugin.outputDir>
 
         <!-- TEST -->
-        <junit.version>5.13.4</junit.version>
+        <junit.version>5.14.1</junit.version>
         <assertj-core.version>3.27.6</assertj-core.version>
-        <junit-launcher.version>1.13.4</junit-launcher.version>
+        <junit-launcher.version>1.14.1</junit-launcher.version>
 
         <!-- TEST COVERAGE -->
         <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
-        <jacoco-maven-plugin.version>0.8.13</jacoco-maven-plugin.version>
+        <jacoco-maven-plugin.version>0.8.14</jacoco-maven-plugin.version>
         <maven-failsafe-plugin.version>3.5.4</maven-failsafe-plugin.version>
 
         <!-- PUBLISH -->
