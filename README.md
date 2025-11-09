@@ -18,7 +18,7 @@ The **Nano Dev Console** is a lightweight, drop-in module for any Nano-based app
 
 ## Compatibility
 
-- **Nano:** Tested with `2025.1.4`  
+- **Nano:** Tested with `2025.11.3131219`  
 - **Java:** Recommended LTS 21 (no issues detected with JDK 25 until now)  
 - **Packaging:** JAR
 
@@ -48,6 +48,25 @@ mvn clean install
   <artifactId>nano</artifactId>
   <version>${nano.version}</version>
 </dependency>
+```
+
+3) To use the Dev Console UI to start your app’s Nano services, add the below plugin to your POM. It discovers all Nano services without using any reflection.
+
+```xml
+<plugin>
+    <groupId>io.github.absketches</groupId>
+    <artifactId>codegen-concrete-classes-maven-plugin</artifactId>
+    <version>${codegen-concrete-classes-maven-plugin.version}</version>
+    <executions>
+        <execution>
+            <id>nano-service-index</id>
+            <phase>process-classes</phase>
+            <goals>
+                <goal>generate</goal>
+            </goals>
+        </execution>
+    </executions>
+</plugin>
 ```
 
 Once on the classpath, the service starts with your app and exposes the UI.

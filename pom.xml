@@ -6,7 +6,7 @@
 
     <groupId>org.nanonative</groupId>
     <artifactId>devconsole</artifactId>
-    <version>1.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <packaging>jar</packaging>
 
     <name>Dev Console for Nano</name>
@@ -32,7 +32,7 @@
     </licenses>
 
     <properties>
-        <nano-version>2025.10.2750958</nano-version>
+        <nano-version>2025.11.3131219</nano-version>
         <java-version>21</java-version>
         <project.encoding>UTF-8</project.encoding>
         <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
