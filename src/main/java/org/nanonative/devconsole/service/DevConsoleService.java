@@ -4,7 +4,6 @@ import berlin.yuna.typemap.model.LinkedTypeMap;
 import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMapI;
-import com.sun.management.OperatingSystemMXBean;
 import org.nanonative.devconsole.util.ClassInfo;
 import org.nanonative.devconsole.util.DevConfig;
 import org.nanonative.devconsole.util.DevEvents;
@@ -21,14 +20,13 @@ import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
 import org.nanonative.nano.helper.event.model.Channel;
 import org.nanonative.nano.helper.event.model.Event;
+import org.nanonative.nano.services.http.HttpServer;
 import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.URL;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -58,8 +56,11 @@ import java.util.stream.Collectors;
 import org.nanonative.nano.services.logging.LogFormatRegister;
 
 import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
+import static java.lang.Thread.sleep;
 import static org.nanonative.devconsole.util.ResponseHelper.getTypeFromFileExt;
 import static org.nanonative.devconsole.util.ResponseHelper.responseOk;
+import static org.nanonative.devconsole.util.SystemUtil.computeBaseUrl;
+import static org.nanonative.devconsole.util.SystemUtil.getCpuUsagePercent;
 import static org.nanonative.devconsole.util.UiHelper.STATIC_FILES;
 import static org.nanonative.devconsole.util.UiHelper.loadStaticFiles;
 import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
@@ -90,7 +91,6 @@ public class DevConsoleService extends Service {
     public static final String SERVICES_PATH = "META-INF/io/github/absketches/plugin/services.properties";
 
     public static final Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
-    public static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
     // Configurable fields
@@ -124,7 +124,13 @@ public class DevConsoleService extends Service {
             throw new RuntimeException(e);
         }
         channelListener = context.subscribeEvent(EVENT_APP_HEARTBEAT, (ev, __) -> checkForNewChannelsAndSubscribe());
-        context.info(() -> "[{}] started at {} ", name(), BASE_URL + basePath);
+        // TODO: Remove - sleep added as HttpServer may take more time to initialize
+        try {
+            sleep(1);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        context.info(() -> "[{}] started at {}{}{} ", name(), computeBaseUrl(context.nano().service(HttpServer.class)), BASE_URL, basePath);
     }
 
     protected void populateServiceIndex() {
@@ -309,13 +315,13 @@ public class DevConsoleService extends Service {
             .putR("runningServices", getFilteredServices().size())
             .putR("activeServices", getFilteredServices().stream().map(Service::name).toList())
             .putR("schedulers", context.nano().schedulers().size())
-            .putR("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum())
+            .putR("listeners", getListenerCount(context.nano().listeners().values()))
             .putR("heapUsage", context.nano().heapMemoryUsage())
             .putR("os", System.getProperty("os.name") + " - " + System.getProperty("os.version"))
             .putR("arch", System.getProperty("os.arch"))
             .putR("java", System.getProperty("java.version"))
             .putR("cores", Runtime.getRuntime().availableProcessors())
-            .putR("cpuUsage", BigDecimal.valueOf(osBean.getProcessCpuLoad() * 100.0).setScale(2, RoundingMode.HALF_UP).doubleValue())
+            .putR("cpuUsage", getCpuUsagePercent())
             .putR("threadsNano", NanoThread.activeNanoThreads())
             .putR("threadsActive", NanoThread.activeCarrierThreads())
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
@@ -326,6 +332,10 @@ public class DevConsoleService extends Service {
 
         loadInactiveServices().ifPresent(services -> systemInfo.putR("inactiveServices", services));
         return systemInfo;
+    }
+
+    protected static long getListenerCount(final Collection<Set<Consumer<? super Event<?, ?>>>> listenerList) {
+        return new ArrayList<>(listenerList).stream().mapToLong(Collection::size).sum();
     }
 
     protected List<Service> getFilteredServices() {
@@ -377,7 +387,7 @@ public class DevConsoleService extends Service {
     @Override
     public void onEvent(Event<?, ?> event) {}
 
-    public void removeLastNElements(Deque<?> deque, final int N) {
+    public void removeLastNElements(final Deque<?> deque, final int N) {
         lock.lock();
         for (int i = 0; i < N; i++) {
             deque.removeLast();
@@ -385,7 +395,7 @@ public class DevConsoleService extends Service {
         lock.unlock();
     }
 
-    private Set<String> fetchCorrectPropFile(List<URL> urls) {
+    private Set<String> fetchCorrectPropFile(final List<URL> urls) {
         String serviceFqcn = Service.class.getCanonicalName();
         Set<String> services = new HashSet<>();
         int svcCnt = 0;
