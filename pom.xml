@@ -42,7 +42,7 @@
         <project.reporting.outputEncoding>${project.encoding}</project.reporting.outputEncoding>
         <codegen-concrete-classes-maven-plugin.version>2.0.0</codegen-concrete-classes-maven-plugin.version>
         <codegen-concrete-classes-maven-plugin.baseclass>org.nanonative.nano.core.model.Service</codegen-concrete-classes-maven-plugin.baseclass>
-        <codegen-concrete-classes-maven-plugin.outputDir>META-INF/io/github/absketches/plugin/services.properties</codegen-concrete-classes-maven-plugin.outputDir>
+        <codegen-concrete-classes-maven-plugin.outputFile>services-devconsole.properties</codegen-concrete-classes-maven-plugin.outputFile>
 
         <!-- TEST -->
         <junit.version>6.0.1</junit.version>
@@ -120,7 +120,7 @@
                         </goals>
                         <configuration>
                             <baseClasses>${codegen-concrete-classes-maven-plugin.baseclass}</baseClasses>
-                            <outputDir>${codegen-concrete-classes-maven-plugin.outputDir}</outputDir>
+                            <outputFile>${codegen-concrete-classes-maven-plugin.outputFile}</outputFile>
                             <usePrecompiledLists>false</usePrecompiledLists>
                             <verbose>true</verbose>
                         </configuration>
