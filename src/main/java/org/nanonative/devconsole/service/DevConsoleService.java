@@ -89,6 +89,7 @@ public class DevConsoleService extends Service {
     public static final String DEV_CONFIG_URL = "/config";
     public static final String DEV_SERVICE_URL = "/service";
     public static final String SERVICES_PATH = "META-INF/io/github/absketches/plugin/services.properties";
+    public static final String CONSOLE_SERVICES_PATH = "META-INF/io/github/absketches/plugin/services-devconsole.properties";
 
     public static final Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
@@ -138,6 +139,7 @@ public class DevConsoleService extends Service {
         final List<URL> urls;
         try {
             urls = Collections.list(cl.getResources(SERVICES_PATH));
+            urls.addAll(Collections.list(cl.getResources(CONSOLE_SERVICES_PATH)));
             if (!urls.isEmpty()) {
                 Set<String> serviceFqcnList = fetchCorrectPropFile(urls);
                 svcFactory = new ServiceFactory(new ArrayList<>(serviceFqcnList));

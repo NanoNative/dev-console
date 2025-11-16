@@ -1,6 +1,18 @@
 # Nano Dev Console Service
 
-The **Nano Dev Console** is a lightweight, drop-in module for any Nano-based application that gives you **runtime visibility** into events, logs, and system metrics. It exposes a small HTTP UI + JSON endpoints and requires **no code changes** in your app beyond adding the dependency.
+The **Nano Dev Console** is a lightweight, plug-and-play module for any Nano-powered application, providing runtime insight into events, logs, and system metrics. It offers a minimal HTTP UI along with JSON endpoints, and requires zero application code changes—just add the dependency.
+
+It is fully compatible with GraalVM. For native image builds, include the following entry in your `resource-config.json`:
+
+```json
+{
+  "resources": {
+      "includes": [
+          { "pattern": "META-INF/io/github/absketches/plugin/services.properties" }
+      ]
+  }
+}
+```
 
 ![Dev Console screenshot](img.png)
 
@@ -50,13 +62,13 @@ mvn clean install
 </dependency>
 ```
 
-3) To use the Dev Console UI to start your app’s Nano services, add the below plugin to your POM. It discovers all Nano services without using any reflection.
+3) To use the Dev Console UI to start your app’s Nano services, add the below plugin to your POM. It discovers all Nano services.
 
 ```xml
 <plugin>
     <groupId>io.github.absketches</groupId>
     <artifactId>codegen-concrete-classes-maven-plugin</artifactId>
-    <version>${codegen-concrete-classes-maven-plugin.version}</version>
+    <version>2.0.0</version>
     <executions>
         <execution>
             <id>nano-service-index</id>
@@ -166,14 +178,16 @@ You can **pause** charts to inspect, and **export** events/logs as text.
 
 > The Dev Console is mounted under `BASE_URL = /dev-console`.
 
-| Method | Path                                    | Description                              |
-|-------:|-----------------------------------------|------------------------------------------|
-|  GET   | `/dev-console/system-info`              | JSON snapshot of system & JVM info       |
-|  GET   | `/dev-console/events`                   | JSON list of recent events               |
-|  GET   | `/dev-console/logs`                     | JSON list of recent logs                 |
-| PATCH  | `/dev-console/config`                   | Update runtime config (see below)        |
-|  GET   | `/dev-console/<uiPath>` (default `/ui`) | Dev Console UI (HTML)                    |
-|  GET   | `/dev-console/{fileName}`               | Static UI assets                         |
+| Method | Path                                    | Description                        |
+|-------:|-----------------------------------------|------------------------------------|
+|    GET | `/dev-console/system-info`              | JSON snapshot of system & JVM info |
+|    GET | `/dev-console/events`                   | JSON list of recent events         |
+|    GET | `/dev-console/logs`                     | JSON list of recent logs           |
+|  PATCH | `/dev-console/config`                   | Update runtime config (see below)  |
+|    GET | `/dev-console/<uiPath>` (default `/ui`) | Dev Console UI (HTML)              |
+|    GET | `/dev-console/{fileName}`               | Static UI assets                   |
+| DELETE | `/dev-console/service/{serviceName}`    | Stop a Nano service                |
+|  PATCH | `/dev-console/service/{serviceName}`    | Start a Nano service               |
 
-> Note: Dev Console HTTP requests are **not** recorded as events.
+> Note: Dev Console HTTP requests are not logged as events, but internal operations - such as starting or stopping a service will still be captured and logged.
 
