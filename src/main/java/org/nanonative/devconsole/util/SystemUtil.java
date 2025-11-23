@@ -5,7 +5,6 @@ import org.nanonative.nano.services.http.HttpServer;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.InetAddress;
-import java.net.InetSocketAddress;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
@@ -18,18 +17,11 @@ public class SystemUtil {
 
     private SystemUtil() {}
 
-    public static String computeBaseUrl(final HttpServer http) {
-        if (null == http)
-            return "";
-
-        final InetSocketAddress addr = http.address();
-        if (null == addr)
-            return "";
-
-        final int port = http.port();
+    public static String computeBaseUrl(final HttpServer server) {
         String host;
-        final InetAddress ia = addr.getAddress();
-        final boolean isHttps = (http.server() instanceof com.sun.net.httpserver.HttpsServer);
+        final int port = server.port();
+        final InetAddress ia = server.address().getAddress();
+        final boolean isHttps = (server.server() instanceof com.sun.net.httpserver.HttpsServer);
         final boolean isDefaultPort = (isHttps && 443 == port) || (!isHttps && 80 == port);
         final String protocol = isHttps ? "https" : "http";
 

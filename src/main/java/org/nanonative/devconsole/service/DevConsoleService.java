@@ -56,7 +56,6 @@ import java.util.stream.Collectors;
 import org.nanonative.nano.services.logging.LogFormatRegister;
 
 import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
-import static java.lang.Thread.sleep;
 import static org.nanonative.devconsole.util.ResponseHelper.getTypeFromFileExt;
 import static org.nanonative.devconsole.util.ResponseHelper.responseOk;
 import static org.nanonative.devconsole.util.SystemUtil.computeBaseUrl;
@@ -77,6 +76,7 @@ public class DevConsoleService extends Service {
     public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in memory");
     public static final String CONFIG_DEV_CONSOLE_MAX_LOGS = registerConfig("dev_console_max_logs", "Max number of logs to retain in memory");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
+    public static final String CONFIG_DEV_CONSOLE_SERVICES_FILE = registerConfig("dev_console_svc_file", "Output file name of services plugin");
 
     // Constants
     public static final String BASE_URL = "/dev-console";
@@ -88,8 +88,9 @@ public class DevConsoleService extends Service {
     public static final String DEV_LOGS_URL = "/logs";
     public static final String DEV_CONFIG_URL = "/config";
     public static final String DEV_SERVICE_URL = "/service";
-    public static final String SERVICES_PATH = "META-INF/io/github/absketches/plugin/services.properties";
-    public static final String CONSOLE_SERVICES_PATH = "META-INF/io/github/absketches/plugin/services-devconsole.properties";
+    public static final String SVC_DIR = "META-INF/io/github/absketches/plugin/";
+    public static final String DEFAULT_SVC_FILE = "services.properties";
+    public static final String DEV_SVC_FILE = "services-devconsole.properties";
 
     public static final Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
@@ -98,6 +99,7 @@ public class DevConsoleService extends Service {
     protected String basePath;
     protected Integer maxEvents;
     protected Integer maxLogs;
+    protected String svcFileName;
 
     // Data structures
     protected Consumer<Event<Void, Void>> channelListener;
@@ -114,7 +116,6 @@ public class DevConsoleService extends Service {
     // Populate this only once at startup - rest all read ops and not expected to run into concurrency issues
     protected Set<String> servicesIndex = new LinkedHashSet<>();
 
-
     @Override
     public void start() {
         checkForNewChannelsAndSubscribe();
@@ -125,21 +126,21 @@ public class DevConsoleService extends Service {
             throw new RuntimeException(e);
         }
         channelListener = context.subscribeEvent(EVENT_APP_HEARTBEAT, (ev, __) -> checkForNewChannelsAndSubscribe());
-        // TODO: Remove - sleep added as HttpServer may take more time to initialize
-        try {
-            sleep(1);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-        context.info(() -> "[{}] started at {}{}{} ", name(), computeBaseUrl(context.nano().service(HttpServer.class)), BASE_URL, basePath);
+
+        HttpServer httpServer;
+        do {
+            httpServer = context.nano().service(HttpServer.class);
+        } while (null == httpServer || !httpServer.isReady());
+
+        context.info(() -> "[{}] started at {}{}{} ", name(), computeBaseUrl(httpServer), BASE_URL, basePath);
     }
 
     protected void populateServiceIndex() {
         final ClassLoader cl = Thread.currentThread().getContextClassLoader();
         final List<URL> urls;
         try {
-            urls = Collections.list(cl.getResources(SERVICES_PATH));
-            urls.addAll(Collections.list(cl.getResources(CONSOLE_SERVICES_PATH)));
+            urls = Collections.list(cl.getResources(SVC_DIR + svcFileName));
+            urls.addAll(Collections.list(cl.getResources(SVC_DIR + DEV_SVC_FILE)));
             if (!urls.isEmpty()) {
                 Set<String> serviceFqcnList = fetchCorrectPropFile(urls);
                 svcFactory = new ServiceFactory(new ArrayList<>(serviceFqcnList));
@@ -359,10 +360,10 @@ public class DevConsoleService extends Service {
 
     @Override
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
-        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
-        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
-        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
-
+        this.maxEvents = merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS);
+        this.maxLogs = merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS);
+        this.basePath = merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL);
+        this.svcFileName = merged.asStringOpt(CONFIG_DEV_CONSOLE_SERVICES_FILE).orElse(DEFAULT_SVC_FILE);
         if (maxEvents < eventHistory.size()) {
             removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
         }

@@ -94,11 +94,12 @@ Once on the classpath, the service starts with your app and exposes the UI.
 
 Config keys are registered via Nano’s config system. You can set them via your usual mechanism (e.g., env, file, system props). Defaults shown below.
 
-| Key                      | Type   | Default  | Description                                                                  |
-|--------------------------|--------|--------- |------------------------------------------------------------------------------|
-| `dev_console_max_events` | int    | `1000`   | Max events retained in memory                                                |
-| `dev_console_max_logs`   | int    | `1000`   | Max logs retained in memory                                                  |
-| `dev_console_url`        | string | `/ui`    | UI path under `/dev-console` (e.g., `/alex` → UI at `/dev-console/alex`)     |
+| Key                       | Type   | Default  | Description                                                                  |
+|---------------------------|--------|--------- |------------------------------------------------------------------------------|
+| `dev_console_max_events`  | int    | `1000`   | Max events retained in memory                                                |
+| `dev_console_max_logs`    | int    | `1000`   | Max logs retained in memory                                                  |
+| `dev_console_url`         | string | `/ui`    | UI path under `/dev-console` (e.g., `/alex` → UI at `/dev-console/alex`)     |
+| `dev_console_svc_file`    | string | `services.properties` | Output file name of services plugin                             |
 
 **Examples**
 
