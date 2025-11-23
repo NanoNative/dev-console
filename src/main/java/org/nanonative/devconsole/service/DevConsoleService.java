@@ -4,7 +4,6 @@ import berlin.yuna.typemap.model.LinkedTypeMap;
 import berlin.yuna.typemap.model.TypeInfo;
 import berlin.yuna.typemap.model.TypeList;
 import berlin.yuna.typemap.model.TypeMapI;
-import com.sun.management.OperatingSystemMXBean;
 import org.nanonative.devconsole.util.ClassInfo;
 import org.nanonative.devconsole.util.DevConfig;
 import org.nanonative.devconsole.util.DevEvents;
@@ -21,14 +20,13 @@ import org.nanonative.nano.core.model.NanoThread;
 import org.nanonative.nano.core.model.Service;
 import org.nanonative.nano.helper.event.model.Channel;
 import org.nanonative.nano.helper.event.model.Event;
+import org.nanonative.nano.services.http.HttpServer;
 import org.nanonative.nano.services.http.model.ContentType;
 import org.nanonative.nano.services.http.model.HttpObject;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.management.ManagementFactory;
-import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.net.URL;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -60,6 +58,8 @@ import org.nanonative.nano.services.logging.LogFormatRegister;
 import static berlin.yuna.typemap.logic.JsonEncoder.toJson;
 import static org.nanonative.devconsole.util.ResponseHelper.getTypeFromFileExt;
 import static org.nanonative.devconsole.util.ResponseHelper.responseOk;
+import static org.nanonative.devconsole.util.SystemUtil.computeBaseUrl;
+import static org.nanonative.devconsole.util.SystemUtil.getCpuUsagePercent;
 import static org.nanonative.devconsole.util.UiHelper.STATIC_FILES;
 import static org.nanonative.devconsole.util.UiHelper.loadStaticFiles;
 import static org.nanonative.nano.core.model.Context.EVENT_APP_HEARTBEAT;
@@ -76,6 +76,7 @@ public class DevConsoleService extends Service {
     public static final String CONFIG_DEV_CONSOLE_MAX_EVENTS = registerConfig("dev_console_max_events", "Max number of events to retain in memory");
     public static final String CONFIG_DEV_CONSOLE_MAX_LOGS = registerConfig("dev_console_max_logs", "Max number of logs to retain in memory");
     public static final String CONFIG_DEV_CONSOLE_URL = registerConfig("dev_console_url", "Endpoint for the dev console ui");
+    public static final String CONFIG_DEV_CONSOLE_SERVICES_FILE = registerConfig("dev_console_svc_file", "Output file name of services plugin");
 
     // Constants
     public static final String BASE_URL = "/dev-console";
@@ -87,16 +88,18 @@ public class DevConsoleService extends Service {
     public static final String DEV_LOGS_URL = "/logs";
     public static final String DEV_CONFIG_URL = "/config";
     public static final String DEV_SERVICE_URL = "/service";
-    public static final String SERVICES_PATH = "META-INF/io/github/absketches/plugin/services.properties";
+    public static final String SVC_DIR = "META-INF/io/github/absketches/plugin/";
+    public static final String DEFAULT_SVC_FILE = "services.properties";
+    public static final String DEV_SVC_FILE = "services-devconsole.properties";
 
     public static final Formatter logFormatter = LogFormatRegister.getLogFormatter("console");
-    public static final OperatingSystemMXBean osBean = (OperatingSystemMXBean) ManagementFactory.getOperatingSystemMXBean();
     public static final DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
 
     // Configurable fields
     protected String basePath;
     protected Integer maxEvents;
     protected Integer maxLogs;
+    protected String svcFileName;
 
     // Data structures
     protected Consumer<Event<Void, Void>> channelListener;
@@ -113,7 +116,6 @@ public class DevConsoleService extends Service {
     // Populate this only once at startup - rest all read ops and not expected to run into concurrency issues
     protected Set<String> servicesIndex = new LinkedHashSet<>();
 
-
     @Override
     public void start() {
         checkForNewChannelsAndSubscribe();
@@ -124,14 +126,21 @@ public class DevConsoleService extends Service {
             throw new RuntimeException(e);
         }
         channelListener = context.subscribeEvent(EVENT_APP_HEARTBEAT, (ev, __) -> checkForNewChannelsAndSubscribe());
-        context.info(() -> "[{}] started at {} ", name(), BASE_URL + basePath);
+
+        HttpServer httpServer;
+        do {
+            httpServer = context.nano().service(HttpServer.class);
+        } while (null == httpServer || !httpServer.isReady());
+
+        context.info(() -> "[{}] started at {}{}{} ", name(), computeBaseUrl(httpServer), BASE_URL, basePath);
     }
 
     protected void populateServiceIndex() {
         final ClassLoader cl = Thread.currentThread().getContextClassLoader();
         final List<URL> urls;
         try {
-            urls = Collections.list(cl.getResources(SERVICES_PATH));
+            urls = Collections.list(cl.getResources(SVC_DIR + svcFileName));
+            urls.addAll(Collections.list(cl.getResources(SVC_DIR + DEV_SVC_FILE)));
             if (!urls.isEmpty()) {
                 Set<String> serviceFqcnList = fetchCorrectPropFile(urls);
                 svcFactory = new ServiceFactory(new ArrayList<>(serviceFqcnList));
@@ -309,13 +318,13 @@ public class DevConsoleService extends Service {
             .putR("runningServices", getFilteredServices().size())
             .putR("activeServices", getFilteredServices().stream().map(Service::name).toList())
             .putR("schedulers", context.nano().schedulers().size())
-            .putR("listeners", context.nano().listeners().values().stream().mapToLong(Collection::size).sum())
+            .putR("listeners", getListenerCount(context.nano().listeners().values()))
             .putR("heapUsage", context.nano().heapMemoryUsage())
             .putR("os", System.getProperty("os.name") + " - " + System.getProperty("os.version"))
             .putR("arch", System.getProperty("os.arch"))
             .putR("java", System.getProperty("java.version"))
             .putR("cores", Runtime.getRuntime().availableProcessors())
-            .putR("cpuUsage", BigDecimal.valueOf(osBean.getProcessCpuLoad() * 100.0).setScale(2, RoundingMode.HALF_UP).doubleValue())
+            .putR("cpuUsage", getCpuUsagePercent())
             .putR("threadsNano", NanoThread.activeNanoThreads())
             .putR("threadsActive", NanoThread.activeCarrierThreads())
             .putR("otherThreads", ManagementFactory.getThreadMXBean().getThreadCount() - NanoThread.activeCarrierThreads())
@@ -326,6 +335,10 @@ public class DevConsoleService extends Service {
 
         loadInactiveServices().ifPresent(services -> systemInfo.putR("inactiveServices", services));
         return systemInfo;
+    }
+
+    protected static long getListenerCount(final Collection<Set<Consumer<? super Event<?, ?>>>> listenerList) {
+        return new ArrayList<>(listenerList).stream().mapToLong(Collection::size).sum();
     }
 
     protected List<Service> getFilteredServices() {
@@ -347,10 +360,10 @@ public class DevConsoleService extends Service {
 
     @Override
     public void configure(TypeMapI<?> configs, TypeMapI<?> merged) {
-        this.maxEvents = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS));
-        this.maxLogs = configs.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS));
-        this.basePath = configs.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL));
-
+        this.maxEvents = merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_EVENTS).orElse(DEFAULT_MAX_EVENTS);
+        this.maxLogs = merged.asIntOpt(CONFIG_DEV_CONSOLE_MAX_LOGS).orElse(DEFAULT_MAX_LOGS);
+        this.basePath = merged.asStringOpt(CONFIG_DEV_CONSOLE_URL).orElse(DEFAULT_UI_URL);
+        this.svcFileName = merged.asStringOpt(CONFIG_DEV_CONSOLE_SERVICES_FILE).orElse(DEFAULT_SVC_FILE);
         if (maxEvents < eventHistory.size()) {
             removeLastNElements(eventHistory, eventHistory.size() - maxEvents);
         }
@@ -377,7 +390,7 @@ public class DevConsoleService extends Service {
     @Override
     public void onEvent(Event<?, ?> event) {}
 
-    public void removeLastNElements(Deque<?> deque, final int N) {
+    public void removeLastNElements(final Deque<?> deque, final int N) {
         lock.lock();
         for (int i = 0; i < N; i++) {
             deque.removeLast();
@@ -385,7 +398,7 @@ public class DevConsoleService extends Service {
         lock.unlock();
     }
 
-    private Set<String> fetchCorrectPropFile(List<URL> urls) {
+    private Set<String> fetchCorrectPropFile(final List<URL> urls) {
         String serviceFqcn = Service.class.getCanonicalName();
         Set<String> services = new HashSet<>();
         int svcCnt = 0;

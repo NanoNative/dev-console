@@ -1,0 +1,8 @@
+{
+    "resources": {
+        "includes": [
+            { "pattern": "ui/.*" },
+            { "pattern": "META-INF/io/github/absketches/plugin/.*" }
+        ]
+    }
+}
