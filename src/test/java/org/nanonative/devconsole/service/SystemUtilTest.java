@@ -65,5 +65,6 @@ public class SystemUtilTest {
         Nano nano = new Nano(Map.of(CONFIG_DEV_CONSOLE_URL, "/user1"), new DevConsoleService(), server);
         String baseUrl = SystemUtil.computeBaseUrl(server);
         assertThat(baseUrl).isEqualTo("http://localhost:" + server.address().getPort());
+        assertThat(nano.stop(SystemUtilTest.class).waitForStop().isReady()).isFalse();
     }
 }
