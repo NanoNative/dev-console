@@ -97,12 +97,20 @@ class DevConsoleServiceTest {
             .body(Map.of("baseUrl", newBaseUrl, "maxLogs", newMaxLogs))
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_CONFIG_URL)
             .send(nano.context(DevConsoleServiceTest.class));
-
         assertThat(result.statusCode()).isEqualTo(200);
         assertThat(result.hasContentType(ContentType.APPLICATION_JSON));
         assertThat(result.bodyAsString()).contains(newBaseUrl).contains(String.valueOf(newMaxLogs));
         assertThat(baseUrl).isEqualTo(DEFAULT_UI_URL);
         assertThat(maxLogs).isEqualTo(DEFAULT_MAX_LOGS);
+
+        final HttpObject checkNewUrl = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + newBaseUrl)
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(checkNewUrl.statusCode()).isEqualTo(200);
+        assertThat(checkNewUrl.hasContentType(ContentType.TEXT_HTML));
+        assertThat(checkNewUrl.bodyAsString()).contains("<!DOCTYPE html>");
+
         assertThat(devConsoleService.basePath).isEqualTo(newBaseUrl);
         assertThat(devConsoleService.maxLogs).isEqualTo(newMaxLogs);
         assertThat(devConsoleService.maxEvents).isEqualTo(DEFAULT_MAX_EVENTS);
@@ -166,7 +174,7 @@ class DevConsoleServiceTest {
     }
 
     @Test
-    void serviceDeregisterSuccessTest() {
+    void serviceDeregisterSuccessTest() throws InterruptedException {
         DevConsoleService devConsole = new DevConsoleService();
         final Nano nano = new Nano(new HttpServer(), devConsole, new HttpClient());
         final HttpObject beforeTestResult = new HttpObject()
@@ -176,7 +184,7 @@ class DevConsoleServiceTest {
         assertThat(beforeTestResult.statusCode()).isEqualTo(200);
         assertThat(beforeTestResult.hasContentType(ContentType.APPLICATION_JSON));
         final TypeInfo<?> responseBody = beforeTestResult.bodyAsJson();
-        final long serviceCountBefore =  responseBody.get(Integer.class, "runningServices");
+        final long serviceCountBefore = responseBody.get(Integer.class, "runningServices");
         assertThat(serviceCountBefore).isEqualTo(1L);
 
         final HttpObject deregisterResult = new HttpObject()
@@ -184,6 +192,9 @@ class DevConsoleServiceTest {
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/DevConsoleService")
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
+
+        // Some sleep to let the service shutdown
+        Thread.sleep(2);
 
         final HttpObject afterTestResult = new HttpObject()
             .methodType(HttpMethod.GET)
@@ -194,7 +205,7 @@ class DevConsoleServiceTest {
     }
 
     @Test
-    void serviceDeregisterFailureTest() {
+    void serviceDeregisterFailureTest() throws InterruptedException {
         DevConsoleService devConsole = new DevConsoleService();
         final Nano nano = new Nano(new HttpServer(), devConsole, new HttpClient(), new MetricService());
         final HttpObject beforeTestResult = new HttpObject()
@@ -212,6 +223,10 @@ class DevConsoleServiceTest {
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
+
+        // Some sleep to let the service shutdown
+        Thread.sleep(2);
+
         final long serviceCountAfter = devConsole.getFilteredServices().size();
         assertThat(serviceCountAfter).isEqualTo(serviceCountBefore - 1);
 
@@ -226,7 +241,7 @@ class DevConsoleServiceTest {
     }
 
     @Test
-    void serviceRegisterSuccessTest() {
+    void serviceRegisterSuccessTest() throws InterruptedException {
         DevConsoleService devConsole = new DevConsoleService();
         final Nano nano = new Nano(new HttpServer(), devConsole, new HttpClient());
         final HttpObject beforeTestResult = new HttpObject()
@@ -244,13 +259,17 @@ class DevConsoleServiceTest {
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
+
+        // Some sleep to let the service start
+        Thread.sleep(2);
+
         final long serviceCountAfter = devConsole.getFilteredServices().size();
         assertThat(serviceCountAfter).isEqualTo(serviceCountBefore + 1);
         assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
     @Test
-    void serviceRegisterFailureTest() {
+    void serviceRegisterFailureTest() throws InterruptedException {
         DevConsoleService devConsole = new DevConsoleService();
         final Nano nano = new Nano(new HttpServer(), devConsole, new HttpClient());
         final HttpObject beforeTestResult = new HttpObject()
@@ -268,6 +287,10 @@ class DevConsoleServiceTest {
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
+
+        // Some sleep to let the service start
+        Thread.sleep(2);
+
         final long serviceCountAfter = devConsole.getFilteredServices().size();
         assertThat(serviceCountAfter).isEqualTo(serviceCountBefore + 1);
 
