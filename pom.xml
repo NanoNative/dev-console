@@ -40,7 +40,7 @@
         <maven-ant-plugin-version>3.2.0</maven-ant-plugin-version>
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${project.encoding}</project.reporting.outputEncoding>
-        <codegen-concrete-classes-maven-plugin.version>2025.11.3262134</codegen-concrete-classes-maven-plugin.version>
+        <codegen-concrete-classes-maven-plugin.version>2025.11.3280300</codegen-concrete-classes-maven-plugin.version>
         <codegen-concrete-classes-maven-plugin.baseclass>org.nanonative.nano.core.model.Service</codegen-concrete-classes-maven-plugin.baseclass>
         <codegen-concrete-classes-maven-plugin.outputFile>services-devconsole.properties</codegen-concrete-classes-maven-plugin.outputFile>
 
