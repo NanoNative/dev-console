@@ -1,0 +1,42 @@
+name: "🧹 Dependabot: editorconfig:format"
+
+on:
+    pull_request:
+        types: [opened, synchronize, reopened]
+
+permissions: {}
+
+jobs:
+    format:
+        if: github.actor == 'dependabot[bot]'
+        runs-on: ubuntu-latest
+        permissions:
+            contents: write # needed to write to the PR branch
+        steps:
+            - name: "🔍 Checkout PR branch"
+              uses: actions/checkout@v5
+              with:
+                  ref: ${{ github.event.pull_request.head.ref }}
+
+            - name: "📋 Read Java Info"
+              id: java_info
+              uses: YunaBraska/java-info-action@main
+
+            - name: "☕ Setup Java [${{ steps.java_info.outputs.java_version }}]"
+              uses: actions/setup-java@v5
+              with:
+                  java-version: ${{ steps.java_info.outputs.java_version }}
+                  distribution: "temurin"
+
+            - name: "🧹 Run editorconfig formatter"
+              run: mvn -B editorconfig:format
+
+            - name: "📤 Commit and push (if changed)"
+              run: |
+                  if [[ -n "$(git status --porcelain)" ]]; then
+                    git config user.name "github-actions[bot]"
+                    git config user.email "github-actions[bot]@users.noreply.github.com"
+                    git add -A
+                    git commit -m "chore: apply formatting"
+                    git push
+                  fi
