@@ -254,17 +254,26 @@ class DevConsoleServiceTest {
         final long serviceCountBefore = devConsole.getFilteredServices().size();
         assertThat(responseBody).hasFieldOrPropertyWithValue("runningServices", serviceCountBefore);
 
-        final HttpObject deregisterResult = new HttpObject()
+        final HttpObject registerResult = new HttpObject()
             .methodType(HttpMethod.PATCH)
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
             .send(nano.context(DevConsoleServiceTest.class));
-        assertThat(deregisterResult.statusCode()).isEqualTo(200);
+        assertThat(registerResult.statusCode()).isEqualTo(200);
 
         // Some sleep to let the service start
         Thread.sleep(2);
 
+        final HttpObject afterStartResult = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(afterStartResult.statusCode()).isEqualTo(200);
+        assertThat(afterStartResult.hasContentType(ContentType.APPLICATION_JSON));
+        final TypeInfo<?> response = afterStartResult.bodyAsJson();
         final long serviceCountAfter = devConsole.getFilteredServices().size();
+        assertThat(response).hasFieldOrPropertyWithValue("runningServices", serviceCountAfter);
         assertThat(serviceCountAfter).isEqualTo(serviceCountBefore + 1);
+
         assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
     }
 
@@ -282,16 +291,24 @@ class DevConsoleServiceTest {
         final long serviceCountBefore = devConsole.getFilteredServices().size();
         assertThat(responseBody).hasFieldOrPropertyWithValue("runningServices", serviceCountBefore);
 
-        final HttpObject deregisterResult = new HttpObject()
+        final HttpObject registerResult = new HttpObject()
             .methodType(HttpMethod.PATCH)
             .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_SERVICE_URL + "/MetricService")
             .send(nano.context(DevConsoleServiceTest.class));
-        assertThat(deregisterResult.statusCode()).isEqualTo(200);
+        assertThat(registerResult.statusCode()).isEqualTo(200);
 
         // Some sleep to let the service start
         Thread.sleep(2);
 
+        final HttpObject afterStartResult = new HttpObject()
+            .methodType(HttpMethod.GET)
+            .path(serverUrl + nano.service(HttpServer.class).port() + BASE_URL + DEV_INFO_URL)
+            .send(nano.context(DevConsoleServiceTest.class));
+        assertThat(afterStartResult.statusCode()).isEqualTo(200);
+        assertThat(afterStartResult.hasContentType(ContentType.APPLICATION_JSON));
+        final TypeInfo<?> response = afterStartResult.bodyAsJson();
         final long serviceCountAfter = devConsole.getFilteredServices().size();
+        assertThat(response).hasFieldOrPropertyWithValue("runningServices", serviceCountAfter);
         assertThat(serviceCountAfter).isEqualTo(serviceCountBefore + 1);
 
         final HttpObject duplicateCallResult = new HttpObject()
