@@ -6,7 +6,7 @@
 
     <groupId>org.nanonative</groupId>
     <artifactId>devconsole</artifactId>
-    <version>2025.11.3141539</version>
+    <version>2025.12.3611243</version>
     <packaging>jar</packaging>
 
     <name>dev-console</name>
