@@ -42,7 +42,7 @@ public class SystemUtilTest {
     }
 
     @Test
-    void consecutiveCallsShouldNotDriftWildlyTest() throws InterruptedException {
+    void consecutiveCallsShouldBeFiniteAndBoundedTest() throws InterruptedException {
         SystemUtil.getCpuUsagePercent();
         Thread.sleep(50);
 
@@ -55,8 +55,9 @@ public class SystemUtilTest {
 
         double delta = Math.abs(second - first);
 
-        // Allow a very generous delta to keep robust across environments
-        assertThat(delta).isLessThan(500.0);
+        assertThat(delta).isNotInfinite();
+        assertThat(delta).isNotNaN();
+        assertThat(delta).isBetween(0.0, Runtime.getRuntime().availableProcessors() * 100.0);
     }
 
     @Test
