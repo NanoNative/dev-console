@@ -10,7 +10,9 @@ import org.nanonative.nano.services.http.model.HttpMethod;
 import org.nanonative.nano.services.http.model.HttpObject;
 import org.nanonative.nano.services.metric.logic.MetricService;
 
+import java.time.Instant;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
 import static org.nanonative.devconsole.service.DevConsoleService.BASE_URL;
 import static org.nanonative.devconsole.service.DevConsoleService.CONFIG_DEV_CONSOLE_URL;
@@ -27,6 +29,8 @@ import static org.nanonative.devconsole.util.UiHelper.STATIC_FILES;
 
 class DevConsoleServiceTest {
 
+    protected static long TIMEOUT_MS = 2000;
+    protected static long POLL_MS = 25;
     protected static String serverUrl = "http://localhost:";
 
     @Test
@@ -224,8 +228,8 @@ class DevConsoleServiceTest {
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
 
-        // Some sleep to let the service shutdown
-        Thread.sleep(2);
+        // wait for service to shut down
+        waitUntil(() -> serviceCountBefore - 1 == devConsole.getFilteredServices().size());
 
         final long serviceCountAfter = devConsole.getFilteredServices().size();
         assertThat(serviceCountAfter).isEqualTo(serviceCountBefore - 1);
@@ -260,8 +264,8 @@ class DevConsoleServiceTest {
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(registerResult.statusCode()).isEqualTo(200);
 
-        // Some sleep to let the service start
-        Thread.sleep(2);
+        // wait for service to start
+        waitUntil(() -> serviceCountBefore + 1 == devConsole.getFilteredServices().size());
 
         final HttpObject afterStartResult = new HttpObject()
             .methodType(HttpMethod.GET)
@@ -297,8 +301,8 @@ class DevConsoleServiceTest {
             .send(nano.context(DevConsoleServiceTest.class));
         assertThat(registerResult.statusCode()).isEqualTo(200);
 
-        // Some sleep to let the service start
-        Thread.sleep(2);
+        // wait for service to start
+        waitUntil(() -> serviceCountBefore + 1 == devConsole.getFilteredServices().size());
 
         final HttpObject afterStartResult = new HttpObject()
             .methodType(HttpMethod.GET)
@@ -319,5 +323,15 @@ class DevConsoleServiceTest {
         final long serviceCountAfterDuplicate = devConsole.getFilteredServices().size();
         assertThat(serviceCountAfterDuplicate).isEqualTo(serviceCountAfter);
         assertThat(nano.stop(DevConsoleServiceTest.class).waitForStop().isReady()).isFalse();
+    }
+
+    private static void waitUntil(BooleanSupplier condition) throws InterruptedException {
+        long deadline = Instant.now().toEpochMilli() + TIMEOUT_MS;
+        do {
+            if (condition.getAsBoolean())
+                return;
+            Thread.sleep(POLL_MS);
+        } while (Instant.now().toEpochMilli() < deadline);
+        throw new AssertionError("Condition not met within " + TIMEOUT_MS + "ms");
     }
 }
