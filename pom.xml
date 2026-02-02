@@ -35,7 +35,7 @@
         <nano-version>2026.01.0120644</nano-version>
         <java-version>21</java-version>
         <project.encoding>UTF-8</project.encoding>
-        <maven-compiler-plugin.version>3.14.1</maven-compiler-plugin.version>
+        <maven-compiler-plugin.version>3.15.0</maven-compiler-plugin.version>
         <maven-editor-plugin-version>0.2.0</maven-editor-plugin-version>
         <maven-ant-plugin-version>3.2.0</maven-ant-plugin-version>
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
