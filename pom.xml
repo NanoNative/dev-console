@@ -45,9 +45,9 @@
         <codegen-concrete-classes-maven-plugin.outputFile>services-devconsole.properties</codegen-concrete-classes-maven-plugin.outputFile>
 
         <!-- TEST -->
-        <junit.version>6.0.2</junit.version>
+        <junit.version>6.0.3</junit.version>
         <assertj-core.version>3.27.7</assertj-core.version>
-        <junit-launcher.version>6.0.2</junit-launcher.version>
+        <junit-launcher.version>6.0.3</junit-launcher.version>
 
         <!-- TEST COVERAGE -->
         <maven-surefire-plugin.version>3.5.4</maven-surefire-plugin.version>
