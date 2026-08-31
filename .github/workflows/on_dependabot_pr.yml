@@ -23,7 +23,7 @@ jobs:
               uses: YunaBraska/java-info-action@main
 
             - name: "☕ Setup Java [${{ steps.java_info.outputs.java_version }}]"
-              uses: actions/setup-java@v5
+              uses: actions/setup-java@v6
               with:
                   java-version: ${{ steps.java_info.outputs.java_version }}
                   distribution: "temurin"
