@@ -88,7 +88,7 @@ class DevConsoleServiceTest {
     }
 
     @Test
-    void updateConfigTest() {
+    void updateConfigTest() throws InterruptedException {
         final String newBaseUrl = "/tests";
         final int newMaxLogs = 1;
         final DevConsoleService devConsoleService = new DevConsoleService();
@@ -106,6 +106,10 @@ class DevConsoleServiceTest {
         assertThat(result.bodyAsString()).contains(newBaseUrl).contains(String.valueOf(newMaxLogs));
         assertThat(baseUrl).isEqualTo(DEFAULT_UI_URL);
         assertThat(maxLogs).isEqualTo(DEFAULT_MAX_LOGS);
+        waitUntil(() ->
+            newBaseUrl.equals(devConsoleService.basePath)
+                && Integer.valueOf(newMaxLogs).equals(devConsoleService.maxLogs)
+        );
 
         final HttpObject checkNewUrl = new HttpObject()
             .methodType(HttpMethod.GET)
@@ -198,7 +202,7 @@ class DevConsoleServiceTest {
         assertThat(deregisterResult.statusCode()).isEqualTo(200);
 
         // Some sleep to let the service shutdown
-        Thread.sleep(2);
+        waitUntil(() -> !devConsole.isReady());
 
         final HttpObject afterTestResult = new HttpObject()
             .methodType(HttpMethod.GET)
