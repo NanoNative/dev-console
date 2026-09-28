@@ -1,14 +1,15 @@
 # Nano Dev Console Service
 
-The **Nano Dev Console** is a lightweight, plug-and-play module for any Nano-powered application, providing runtime insight into events, logs, and system metrics. It offers a minimal HTTP UI along with JSON endpoints, and requires zero application code changes—just add the dependency.
+The **Nano Dev Console** is a lightweight, plug-and-play module for Nano-powered applications, providing runtime insight into events, logs and system metrics. It offers a minimal HTTP UI along with JSON endpoints and requires minimal application wiring to start/stop Nano services from the dashboard.
 
-It is fully compatible with GraalVM. For native image builds, include the following entry in your `resource-config.json`:
+It is fully compatible with GraalVM. The published artifact ships with native-image resource metadata; if your application maintains its own `resource-config.json`, keep equivalent includes for the UI assets and generated service indexes:
 
 ```json
 {
   "resources": {
       "includes": [
-          { "pattern": "META-INF/io/github/absketches/plugin/services.properties" }
+          { "pattern": "ui/.*" },
+          { "pattern": "META-INF/io/github/absketches/plugin/.*" }
       ]
   }
 }
@@ -24,34 +25,33 @@ It is fully compatible with GraalVM. For native image builds, include the follow
 - **Live logs** with pause & export
 - **System snapshot** (PID, heap usage, CPU %, thread counts, service list)
 - **Change runtime configurations** via Config panel
-- **Zero app wiring** — subscribes to all event channels automatically
+- **Minimal app wiring** — once started, subscribes to all event channels automatically
 
 ---
 
 ## Compatibility
 
-- **Nano:** Tested with `2025.11.3131219`  
-- **Java:** Recommended LTS 21 (no issues detected with JDK 25 until now)  
+- **Nano:** Tested with `2026.9.21`
+- **Java:** Recommended LTS 21
 - **Packaging:** JAR
 
 ---
 
 ## Installation
 
-1) Build and install this project locally:
-
-```bash
-mvn clean install
-```
-
-2) Add the dependency to your Nano app:
+Add Dev Console to your Nano application. Nano is marked as `provided` in Dev Console and will not be transitively added.
 
 ```xml
+<properties>
+  <nano.version>2026.9.21</nano.version>
+  <devconsole.version>2025.12.3611243</devconsole.version>
+</properties>
+
 <!-- Dev Console -->
 <dependency>
   <groupId>org.nanonative</groupId>
   <artifactId>devconsole</artifactId>
-  <version>1.0.0</version>
+  <version>${devconsole.version}</version>
 </dependency>
 
 <!-- Your app must already depend on Nano -->
@@ -62,13 +62,23 @@ mvn clean install
 </dependency>
 ```
 
-3) To use the Dev Console UI to start your app’s Nano services, add the below plugin to your POM. It discovers all Nano services.
+For local development of this repository, build with:
+
+```bash
+./mvnw clean install
+```
+
+To let the Dev Console UI start inactive Nano services, add the service index plugin to your application's POM. It discovers Nano services at build time and writes the service list that Dev Console reads at runtime.
 
 ```xml
+<properties>
+    <codegen-concrete-classes-maven-plugin.version>2025.11.3280300</codegen-concrete-classes-maven-plugin.version>
+</properties>
+
 <plugin>
     <groupId>io.github.absketches</groupId>
     <artifactId>codegen-concrete-classes-maven-plugin</artifactId>
-    <version>2.0.0</version>
+    <version>${codegen-concrete-classes-maven-plugin.version}</version>
     <executions>
         <execution>
             <id>nano-service-index</id>
@@ -76,17 +86,24 @@ mvn clean install
             <goals>
                 <goal>generate</goal>
             </goals>
+            <configuration>
+                <baseClasses>org.nanonative.nano.core.model.Service</baseClasses>
+                <outputFile>services.properties</outputFile>
+                <usePrecompiledLists>false</usePrecompiledLists>
+            </configuration>
         </execution>
     </executions>
 </plugin>
 ```
 
-Once on the classpath, the service starts with your app and exposes the UI.
-```java
-        Nano nano = new Nano(Map.of(
-            CONFIG_SERVICE_HTTP_PORT, "8080"
-        ), new DevConsoleService(), new HttpServer(), new MyAppService(), new OtherAppService());
+If you use a custom output file, set `dev_console_svc_file` to the same filename.
 
+Start `DevConsoleService` with your Nano app to expose the UI:
+
+```java
+Nano nano = new Nano(Map.of(
+    CONFIG_SERVICE_HTTP_PORT, "8080"
+), new DevConsoleService(), new HttpServer(), new MyAppService(), new OtherAppService());
 ```
 ---
 
@@ -191,4 +208,3 @@ You can **pause** charts to inspect, and **export** events/logs as text.
 |  PATCH | `/dev-console/service/{serviceName}`    | Start a Nano service               |
 
 > Note: Dev Console HTTP requests are not logged as events, but internal operations - such as starting or stopping a service will still be captured and logged.
-

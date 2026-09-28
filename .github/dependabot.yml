@@ -6,7 +6,7 @@ updates:
         schedule:
             interval: "weekly"
             day: "monday"
-            time: "09:00"  # 9 AM UTC (1h after our dependency-update workflow and 2h after Nano's dependabot)
+            time: "07:00"  # 7 AM UTC, matching Nano.
         open-pull-requests-limit: 1
         groups:
             all-dependencies:
@@ -19,7 +19,7 @@ updates:
         schedule:
             interval: "weekly"
             day: "monday"
-            time: "09:00"  # 9 AM UTC (1h after our dependency-update workflow and 2h after Nano's dependabot)
+            time: "07:00"  # 7 AM UTC, matching Nano.
         open-pull-requests-limit: 1
         groups:
             all-dependencies:

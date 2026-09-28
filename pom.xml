@@ -299,11 +299,11 @@
 
     <profiles>
         <profile>
-            <!-- mvn clean deploy -P release -->
-            <id>release</id>
+            <!-- mvn clean deploy -Pcentral -->
+            <id>central</id>
             <activation>
                 <property>
-                    <name>release</name>
+                    <name>central</name>
                     <value>true</value>
                 </property>
                 <activeByDefault>false</activeByDefault>
