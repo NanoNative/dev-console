@@ -2,7 +2,18 @@
 
 The **Nano Dev Console** is a lightweight, plug-and-play module for Nano-powered applications, providing runtime insight into events, logs and system metrics. It offers a minimal HTTP UI along with JSON endpoints and requires minimal application wiring to start/stop Nano services from the dashboard.
 
-It is fully compatible with GraalVM. The published artifact ships with native-image resource metadata; if your application maintains its own `resource-config.json`, keep equivalent includes for the UI assets and generated service indexes:
+It is fully compatible with GraalVM. The published artifact ships with Native Image reachability metadata; if your application maintains its own `reachability-metadata.json`, keep equivalent includes for the UI assets and generated service indexes:
+
+```json
+{
+  "resources": [
+    { "glob": "ui/**" },
+    { "glob": "META-INF/io/github/absketches/plugin/**" }
+  ]
+}
+```
+
+For older GraalVM builds that still use `resource-config.json`, the equivalent legacy resource metadata is:
 
 ```json
 {
@@ -72,7 +83,7 @@ To let the Dev Console UI start inactive Nano services, add the service index pl
 
 ```xml
 <properties>
-    <codegen-concrete-classes-maven-plugin.version>2025.11.3280300</codegen-concrete-classes-maven-plugin.version>
+    <codegen-concrete-classes-maven-plugin.version>2026.09.2720606</codegen-concrete-classes-maven-plugin.version>
 </properties>
 
 <plugin>
@@ -89,6 +100,8 @@ To let the Dev Console UI start inactive Nano services, add the service index pl
             <configuration>
                 <baseClasses>org.nanonative.nano.core.model.Service</baseClasses>
                 <outputFile>services.properties</outputFile>
+                <generateReachabilityMetadata>true</generateReachabilityMetadata>
+                <generateReflectConfig>true</generateReflectConfig>
                 <usePrecompiledLists>false</usePrecompiledLists>
             </configuration>
         </execution>
@@ -96,7 +109,7 @@ To let the Dev Console UI start inactive Nano services, add the service index pl
 </plugin>
 ```
 
-If you use a custom output file, set `dev_console_svc_file` to the same filename.
+`generateReachabilityMetadata` and `generateReflectConfig` both default to `true`; they are shown here to make the modern and legacy Native Image outputs explicit. If you use a custom output file, set `dev_console_svc_file` to the same filename. This repository uses `services-devconsole.properties` for its own generated index.
 
 Start `DevConsoleService` with your Nano app to expose the UI:
 
