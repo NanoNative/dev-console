@@ -20,8 +20,8 @@
     </scm>
     <developers>
         <developer>
-            <name>Abhi Basu</name>
-            <email>basuabhi92@gmail.com</email>
+            <name>Abhiroop</name>
+            <email>abhiroop@nanonative.org</email>
         </developer>
     </developers>
     <licenses>
@@ -40,7 +40,7 @@
         <maven-ant-plugin-version>3.2.0</maven-ant-plugin-version>
         <project.build.sourceEncoding>${project.encoding}</project.build.sourceEncoding>
         <project.reporting.outputEncoding>${project.encoding}</project.reporting.outputEncoding>
-        <codegen-concrete-classes-maven-plugin.version>2025.11.3280300</codegen-concrete-classes-maven-plugin.version>
+        <codegen-concrete-classes-maven-plugin.version>2026.09.2720606</codegen-concrete-classes-maven-plugin.version>
         <codegen-concrete-classes-maven-plugin.baseclass>org.nanonative.nano.core.model.Service</codegen-concrete-classes-maven-plugin.baseclass>
         <codegen-concrete-classes-maven-plugin.outputFile>services-devconsole.properties</codegen-concrete-classes-maven-plugin.outputFile>
 
@@ -121,6 +121,8 @@
                         <configuration>
                             <baseClasses>${codegen-concrete-classes-maven-plugin.baseclass}</baseClasses>
                             <outputFile>${codegen-concrete-classes-maven-plugin.outputFile}</outputFile>
+                            <generateReachabilityMetadata>true</generateReachabilityMetadata>
+                            <generateReflectConfig>true</generateReflectConfig>
                             <usePrecompiledLists>false</usePrecompiledLists>
                             <verbose>true</verbose>
                         </configuration>
