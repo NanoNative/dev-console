@@ -32,7 +32,7 @@
     </licenses>
 
     <properties>
-        <nano-version>2026.9.21</nano-version>
+        <nano-version>2026.9.28</nano-version>
         <java-version>21</java-version>
         <project.encoding>UTF-8</project.encoding>
         <maven-compiler-plugin.version>3.16.0</maven-compiler-plugin.version>
