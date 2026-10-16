@@ -1,0 +1,6 @@
+{
+    "resources": [
+        { "glob": "ui/**" },
+        { "glob": "META-INF/io/github/absketches/plugin/**" }
+    ]
+}

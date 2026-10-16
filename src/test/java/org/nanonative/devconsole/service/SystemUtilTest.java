@@ -1,6 +1,7 @@
 package org.nanonative.devconsole.service;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.parallel.Isolated;
 import org.nanonative.devconsole.util.SystemUtil;
 import org.nanonative.nano.core.Nano;
 import org.nanonative.nano.services.http.HttpServer;
@@ -11,6 +12,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.nanonative.devconsole.service.DevConsoleService.CONFIG_DEV_CONSOLE_URL;
 
+@Isolated("CPU usage tests share static sampling state")
 public class SystemUtilTest {
 
     @Test
